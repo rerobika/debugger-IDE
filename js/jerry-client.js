@@ -78,6 +78,33 @@ var keybindings = {
   custom : null, // Create own bindings here.
 };
 
+/**
+* Basic utilities.
+*/
+function Util() {
+  return this;
+}
+
+/**
+* Clears the given html element content.
+*
+* @param {object} element
+*/
+Util.prototype.clearElement = function(element) {
+  element.empty();
+};
+
+/**
+* Scrolls down to the bottom of the given element.
+*
+* @param {object} element
+*/
+Util.prototype.scrollDown = function(element) {
+  element.scrollTop(element.prop("scrollHeight"));
+};
+
+const util = new Util();
+
 /*
 ██       ██████   ██████   ██████  ███████ ██████
 ██      ██    ██ ██       ██       ██      ██   ██
@@ -92,19 +119,19 @@ var Logger = function(panelId)
   function log(str)
   {
     panel.append($("<span class='log data'>" + str + "</span>"));
-    scrollDownToBottom(panel);
+    util.scrollDown(panel);
   }
 
   function err(str)
   {
     panel.append($("<span class='error data'>" + str + "</span>"));
-    scrollDownToBottom(panel);
+    util.scrollDown(panel);
   }
 
   function warn(str)
   {
     panel.append($("<span class='warning data'>" + str + "</span>"));
-    scrollDownToBottom(panel);
+    util.scrollDown(panel);
   }
 
   this.log = log;
@@ -216,7 +243,7 @@ function deleteBreakpointsFromEditor()
     env.editor.session.clearBreakpoint(i);
   }
 
-  resetPanel($("#breakpoints-content"));
+  util.clearElement($("#breakpoints-content"));
 }
 
 function getbacktrace()
@@ -263,16 +290,6 @@ function unhighlightLine(){
 ██      ██   ██ ██   ████ ███████ ███████ ███████
 */
 
-function scrollDownToBottom(element)
-{
-  element.scrollTop(element.prop("scrollHeight"));
-}
-
-function resetPanel(element)
-{
-  element.empty();
-}
-
 function updateBacktracePanel(frame, info)
 {
   var sourceName = info.func.sourceName || info;
@@ -288,13 +305,13 @@ function updateBacktracePanel(frame, info)
       "<div class='list-col list-col-3'>" + func + "</div>" +
     "</div>"
   );
-  scrollDownToBottom(panel);
+  util.scrollDown(panel);
 }
 
 function updateBreakpointsPanel()
 {
   var panel = $("#breakpoints-content");
-  resetPanel(panel);
+  util.clearElement(panel);
 
   var activeBreakpoints = client.debuggerObj.getActiveBreakpoints();
 
@@ -315,7 +332,7 @@ function updateBreakpointsPanel()
     );
   }
 
-  scrollDownToBottom(panel);
+  util.scrollDown(panel);
 }
 
 /*
@@ -1313,7 +1330,7 @@ function DebuggerClient(address)
       client.debuggerObj = null;
       logger.log("Connection closed.");
       // "Reset the editor".
-      resetPanel($("#backtrace-content"));
+      util.clearElement($("#backtrace-content"));
       deleteBreakpointsFromEditor();
       unhighlightLine();
       disableButtons(true);
@@ -1857,7 +1874,7 @@ function DebuggerClient(address)
       case JERRY_DEBUGGER_BACKTRACE:
       case JERRY_DEBUGGER_BACKTRACE_END:
       {
-        resetPanel($("#backtrace-content"));
+        util.clearElement($("#backtrace-content"));
         for (var i = 1; i < message.byteLength; i += cpointerSize + 4)
         {
           var breakpointData = decodeMessage("CI", message, i);
