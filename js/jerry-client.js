@@ -150,13 +150,19 @@ Logger.prototype.error = function(message) {
 };
 
 /**
-* Appends the given data into the panel as a debug information in JSON format.
+* Appends the given data or button into the panel
+* as a debug information in JSON format.
 *
 * @param {mixed} data
+* @param {boolean} button
 */
-Logger.prototype.debug = function(data) {
-  data = "DEBUG LOG: " + JSON.stringify(data);
-  this.panel.append(this.line.clone().addClass("log-debug").text(data));
+Logger.prototype.debug = function(data, button = false) {
+  if (button) {
+    this.panel.append($(data));
+  } else {
+    data = "DEBUG LOG: " + JSON.stringify(data);
+    this.panel.append(this.line.clone().addClass("log-debug").text(data));
+  }
   this.util.scrollDown(this.panel);
 };
 
@@ -519,7 +525,7 @@ function sessionNameCheck(name, log)
   {
     if (log)
     {
-      logger.warning("Warning! The " + name + " is missing.");
+      logger.warning("The " + name + " is missing.");
     }
 
     return false;
@@ -540,7 +546,7 @@ function sessionSourceCheck(source, log)
 
   if (log)
   {
-    logger.warning("Warning! The source in the session is invalid!");
+    logger.warning("The source in the session is invalid!");
   }
 
   return false;
@@ -1748,7 +1754,7 @@ function DebuggerClient(address)
       }
       else
       {
-        appendLog("No pending breakpoints");
+        logger.info("No pending breakpoints");
       }
 
       parseObj = null;
@@ -1847,11 +1853,11 @@ function DebuggerClient(address)
 
         if (breakpoint.func.sourceName != '')
         {
-          if (sessionNameCheck(breakpoint.func.sourceName, true))
+          if (!sessionNameCheck(breakpoint.func.sourceName, true))
           {
-            sessionSourceCheck(breakpoint.func.source.trim(), true);
-          } else {
-            logger.info('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>');
+            //sessionSourceCheck(breakpoint.func.source.trim(), true);
+          //} else {
+            logger.debug('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>', true);
             $(".load-from-jerry").on("click", function()
             {
               unhighlightLine();
