@@ -333,17 +333,22 @@ Eval console
   padding: 0;
 }
 
-.console #console-panel span.log,
-.eval #eval-panel span.log {
+.console #console-panel .log-info,
+.eval #eval-panel .log-info {
   color: #000;
 }
 
-.console #console-panel span.error,
-.eval #eval-panel span.error {
-  color: #f00;
+.console #console-panel .log-warning,
+.eval #eval-panel .log-warning {
+  color: #e65c00;
 }
 
-.console #console-panel span.warning,
-.eval #eval-panel span.warning {
-  color: #e65c00;
+.console #console-panel .log-error,
+.eval #eval-panel .log-error {
+  color: #ff1a1a;
+}
+
+.console #console-panel .log-debug,
+.eval #eval-panel .log-debug {
+  color: #595959;
 }

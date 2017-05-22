@@ -103,44 +103,66 @@ Util.prototype.scrollDown = function(element) {
   element.scrollTop(element.prop("scrollHeight"));
 };
 
-const util = new Util();
 
-/*
-██       ██████   ██████   ██████  ███████ ██████
-██      ██    ██ ██       ██       ██      ██   ██
-██      ██    ██ ██   ███ ██   ███ █████   ██████
-██      ██    ██ ██    ██ ██    ██ ██      ██   ██
-███████  ██████   ██████   ██████  ███████ ██   ██
+/**
+* Simple logger which is writes into the given DOM element.
+*
+* @param {object} panel
 */
+function Logger (panel) {
+  this.panel = panel;
+  this.line = $("<span class='data'></span>");
+  this.util = new Util();
 
-var Logger = function(panelId)
-{
-  var panel = $("#" + panelId);
-  function log(str)
-  {
-    panel.append($("<span class='log data'>" + str + "</span>"));
-    util.scrollDown(panel);
-  }
+  return this;
+}
 
-  function err(str)
-  {
-    panel.append($("<span class='error data'>" + str + "</span>"));
-    util.scrollDown(panel);
-  }
-
-  function warn(str)
-  {
-    panel.append($("<span class='warning data'>" + str + "</span>"));
-    util.scrollDown(panel);
-  }
-
-  this.log = log;
-  this.err = err;
-  this.warn = warn;
+/**
+* Appends the given message into the panel as a simple info.
+*
+* @param {string} message
+*/
+Logger.prototype.info = function (message) {
+  this.panel.append(this.line.clone().addClass("log-info").text(message));
+  this.util.scrollDown(this.panel);
 };
 
-var logger = new Logger("console-panel");
-var evalLogger = new Logger("eval-panel");
+/**
+* Appends the given message into the panel as a warning.
+*
+* @param {string} message
+*/
+Logger.prototype.warning = function (message) {
+  message = "WARNING: " + message;
+  this.panel.append(this.line.clone().addClass("log-warning").text(message));
+  this.util.scrollDown(this.panel);
+};
+
+/**
+* Appends the given message into the panel as an error.
+*
+* @param {string} message
+*/
+Logger.prototype.error = function(message) {
+  message = "ERROR: " + message;
+  this.panel.append(this.line.clone().addClass("log-error").text(message));
+  this.util.scrollDown(this.panel);
+};
+
+/**
+* Appends the given data into the panel as a debug information in JSON format.
+*
+* @param {mixed} data
+*/
+Logger.prototype.debug = function(data) {
+  data = "DEBUG LOG: " + JSON.stringify(data);
+  this.panel.append(this.line.clone().addClass("log-debug").text(data));
+  this.util.scrollDown(this.panel);
+};
+
+const logger = new Logger($("#console-panel"));
+const evalLogger = new Logger($("#eval-panel"));
+const util = new Util();
 
 /*
 ██████  ██    ██ ████████ ████████  ██████  ███    ██ ███████
@@ -259,7 +281,7 @@ function getbacktrace()
     }
     else
     {
-      logger.err("Invalid maximum depth parameter.");
+      logger.error("Invalid maximum depth parameter.");
       return true;
     }
   }
@@ -497,7 +519,7 @@ function sessionNameCheck(name, log)
   {
     if (log)
     {
-      logger.warn("Warning! The " + name + " is missing.");
+      logger.warning("Warning! The " + name + " is missing.");
     }
 
     return false;
@@ -518,7 +540,7 @@ function sessionSourceCheck(source, log)
 
   if (log)
   {
-    logger.warn("Warning! The source in the session is invalid!");
+    logger.warning("Warning! The source in the session is invalid!");
   }
 
   return false;
@@ -647,7 +669,7 @@ $(document).ready(function()
     }
     else
     {
-      logger.err("The File APIs are not fully supported in this browser.");
+      logger.error("The File APIs are not fully supported in this browser.");
     }
   });
 
@@ -665,7 +687,7 @@ $(document).ready(function()
       // Only process javascript files.
       if (!files[i].type.match("application/javascript"))
       {
-        logger.err(files[i].name + " is not a Javascript file.");
+        logger.error(files[i].name + " is not a Javascript file.");
         valid--;
         continue;
       }
@@ -681,7 +703,7 @@ $(document).ready(function()
       }
       if (stored)
       {
-        logger.err(session.data[j].name + " is already loaded.");
+        logger.error(session.data[j].name + " is already loaded.");
         valid--;
         continue;
       }
@@ -699,7 +721,7 @@ $(document).ready(function()
         {
           if (evt.target.name.error === "NotReadableError")
           {
-            logger.err(file.name + " file could not be read.");
+            logger.error(file.name + " file could not be read.");
           }
         }
 
@@ -752,7 +774,7 @@ $(document).ready(function()
   {
     if (session.activeID == 0)
     {
-      logger.err("You can not save the welcome.js file.");
+      logger.error("You can not save the welcome.js file.");
     }
     else
     {
@@ -913,25 +935,25 @@ $(document).ready(function()
 
     if (client.debuggerObj)
     {
-      logger.log("Debugger is connected.");
+      logger.info("Debugger is connected.");
       return true;
     }
 
     if ($("#host-ip").val() == "")
     {
-      logger.err("IP address expected.");
+      logger.error("IP address expected.");
       return true;
     }
 
     if ($("#host-port").val() == "")
     {
-      logger.err("Adress port expected.");
+      logger.error("Adress port expected.");
       return true;
     }
 
     var address = $("#host-ip").val() + ":" + $("#host-port").val();
 
-    logger.log("Connect to: " + address);
+    logger.info("Connect to: " + address);
     client.debuggerObj = new DebuggerClient(address);
 
     return true;
@@ -972,7 +994,7 @@ $(document).ready(function()
 
     if (!found)
     {
-      logger.log("No active breakpoints.")
+      logger.info("No active breakpoints.")
     }
     deleteBreakpointsFromEditor();
   });
@@ -1074,7 +1096,7 @@ $(document).ready(function()
 
 function DebuggerClient(address)
 {
-  logger.log("ws://" + address + "/jerry-debugger");
+  logger.info("ws://" + address + "/jerry-debugger");
 
   var parseObj = null;
   var maxMessageSize = 0;
@@ -1318,7 +1340,7 @@ function DebuggerClient(address)
     client.socket = null;
     client.debuggerObj = null;
 
-    logger.err("Abort connection: " + message);
+    logger.error("Abort connection: " + message);
     throw new Error(message);
   }
 
@@ -1328,7 +1350,7 @@ function DebuggerClient(address)
     {
       client.socket = null;
       client.debuggerObj = null;
-      logger.log("Connection closed.");
+      logger.info("Connection closed.");
       // "Reset the editor".
       util.clearElement($("#backtrace-content"));
       deleteBreakpointsFromEditor();
@@ -1340,7 +1362,7 @@ function DebuggerClient(address)
 
   client.socket.onopen = function(event)
   {
-    logger.log("Connection created.");
+    logger.info("Connection created.");
     disableButtons(false);
   }
 
@@ -1712,7 +1734,7 @@ function DebuggerClient(address)
 
       if (pendingBreakpoints.length != 0)
       {
-        logger.log("Available pending breakpoints");
+        logger.info("Available pending breakpoints");
 
         for (var i in pendingBreakpoints)
         {
@@ -1720,7 +1742,7 @@ function DebuggerClient(address)
           {
             pendingBreakpoints[i] = sourceName + ":" + pendingBreakpoints[i];
           }
-          logger.log("Try to add: " + pendingBreakpoints[i]);
+          logger.info("Try to add: " + pendingBreakpoints[i]);
           client.debuggerObj.setBreakpoint(pendingBreakpoints[i], false);
         }
       }
@@ -1802,7 +1824,7 @@ function DebuggerClient(address)
 
         if (message[0] == JERRY_DEBUGGER_EXCEPTION_HIT)
         {
-          logger.log("Exception throw detected");
+          logger.info("Exception throw detected");
         }
 
         lastBreakpointHit = breakpoint;
@@ -1813,7 +1835,7 @@ function DebuggerClient(address)
           breakpointInfo = " breakpoint:" + breakpoint.offset.activeIndex + " ";
         }
 
-        logger.log("Stopped "
+        logger.info("Stopped "
                    + (breakpoint.at ? "at " : "around ")
                    + breakpointInfo
                    + breakpointToString(breakpoint));
@@ -1829,7 +1851,7 @@ function DebuggerClient(address)
           {
             sessionSourceCheck(breakpoint.func.source.trim(), true);
           } else {
-            logger.log('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>');
+            logger.info('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>');
             $(".load-from-jerry").on("click", function()
             {
               unhighlightLine();
@@ -1902,14 +1924,14 @@ function DebuggerClient(address)
 
         if (message[0] == JERRY_DEBUGGER_EVAL_RESULT_END)
         {
-          evalLogger.log(cesu8ToString(env.evalResult));
+          evalLogger.info(cesu8ToString(env.evalResult));
           env.evalResult = null;
           return;
         }
 
         if (message[0] == JERRY_DEBUGGER_EVAL_ERROR_END)
         {
-          evalLogger.err("Uncaught exception: " + cesu8ToString(env.evalResult));
+          evalLogger.error("Uncaught exception: " + cesu8ToString(env.evalResult));
           env.evalResult = null;
           return;
         }
@@ -1941,7 +1963,7 @@ function DebuggerClient(address)
       encodeMessage("BBCI", values);
     }
 
-    logger.log("Breakpoint " + breakpoint.activeIndex + " at " + breakpointToString(breakpoint));
+    logger.info("Breakpoint " + breakpoint.activeIndex + " at " + breakpointToString(breakpoint));
     updateBreakpointsPanel();
   }
 
@@ -1983,18 +2005,18 @@ function DebuggerClient(address)
     }
     if (!found)
     {
-      logger.log("Breakpoint not found");
+      logger.info("Breakpoint not found");
       if (pending)
       {
         if (line)
         {
           pendingBreakpoints.push(Number(line[2]));
-          logger.log("Pending breakpoint index: " + line[0] + " added");
+          logger.info("Pending breakpoint index: " + line[0] + " added");
         }
         else
         {
           pendingBreakpoints.push(str);
-          logger.log("Pending breakpoint function name: " + str + " added");
+          logger.info("Pending breakpoint function name: " + str + " added");
         }
       }
     }
@@ -2004,21 +2026,21 @@ function DebuggerClient(address)
   {
     if (enable == "")
     {
-      logger.err("Argument required");
+      logger.error("Argument required");
       return;
     }
 
     if (enable == 1)
     {
-      logger.log("Stop at exception enabled");
+      logger.info("Stop at exception enabled");
     }
     else if (enable == 0)
     {
-      logger.log("Stop at exception disabled");
+      logger.info("Stop at exception disabled");
     }
     else
     {
-      logger.log("Invalid input. Usage 1: [Enable] or 0: [Disable].");
+      logger.info("Invalid input. Usage 1: [Enable] or 0: [Disable].");
       return;
     }
 
@@ -2041,13 +2063,13 @@ function DebuggerClient(address)
 
       if (!found)
       {
-        logger.log("No active breakpoints.")
+        logger.info("No active breakpoints.")
       }
     }
 
     else if (!breakpoint)
     {
-      logger.err("No breakpoint found with index " + index);
+      logger.error("No breakpoint found with index " + index);
       return;
     }
 
@@ -2063,48 +2085,48 @@ function DebuggerClient(address)
 
     encodeMessage("BBCI", values);
 
-    logger.log("Breakpoint " + index + " is deleted.");
+    logger.info("Breakpoint " + index + " is deleted.");
   }
 
   this.deletePendingBreakpoint = function(index)
   {
     if (index >= pendingBreakpoints.length)
     {
-      logger.log("Pending breakpoint not found");
+      logger.info("Pending breakpoint not found");
     }
     else
     {
       pendingBreakpoints.splice(index, 1);
-      logger.log("Pending breakpoint " + index + " is deleted.");
+      logger.info("Pending breakpoint " + index + " is deleted.");
     }
   }
 
   this.listBreakpoints = function()
   {
-    logger.log("List of active breakpoints:");
+    logger.info("List of active breakpoints:");
     var found = false;
 
     for (var i in activeBreakpoints)
     {
-      logger.log("  breakpoint " + i + " at " + breakpointToString(activeBreakpoints[i]));
+      logger.info("  breakpoint " + i + " at " + breakpointToString(activeBreakpoints[i]));
       found = true;
     }
 
     if (!found)
     {
-      logger.log("  no active breakpoints");
+      logger.info("  no active breakpoints");
     }
 
     if (pendingBreakpoints.length != 0)
     {
-      logger.log("List of pending breakpoints:");
+      logger.info("List of pending breakpoints:");
       for (var i in pendingBreakpoints)
       {
-        logger.log("  pending breakpoint " + i + " at " + pendingBreakpoints[i]);
+        logger.info("  pending breakpoint " + i + " at " + pendingBreakpoints[i]);
       }
     }
     else {
-      logger.log("No pending breakpoints");
+      logger.info("No pending breakpoints");
     }
   }
 
@@ -2112,7 +2134,7 @@ function DebuggerClient(address)
   {
     if (!lastBreakpointHit)
     {
-      logger.log("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
+      logger.info("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
       return;
     }
 
@@ -2125,26 +2147,26 @@ function DebuggerClient(address)
   {
     if (!lastBreakpointHit)
     {
-      logger.err("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
+      logger.error("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
       return;
     }
 
     encodeMessage("BI", [ JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
 
-    logger.log("Backtrace:");
+    logger.info("Backtrace:");
   }
 
   this.sendEval = function(str)
   {
     if (!lastBreakpointHit)
     {
-      logger.err("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
+      logger.error("This command is allowed only if JavaScript execution is stopped at a breakpoint.");
       return;
     }
 
     if (str == "")
     {
-      logger.err("Argument required");
+      logger.error("Argument required");
       return;
     }
 
@@ -2173,7 +2195,7 @@ function DebuggerClient(address)
   {
     if (lastBreakpointHit)
     {
-      logger.log(lastBreakpointHit.func.source);
+      logger.info(lastBreakpointHit.func.source);
     }
   }
 
@@ -2189,7 +2211,7 @@ function DebuggerClient(address)
         sourceName = "<unknown>";
       }
 
-      logger.log("Function 0x"
+      logger.info("Function 0x"
                  + Number(i).toString(16)
                  + " '"
                  + func.name
@@ -2209,7 +2231,7 @@ function DebuggerClient(address)
           active = " (active: " + func.lines[j].active + ")";
         }
 
-        logger.log("  Breakpoint line: " + j + " at memory offset: " + func.lines[j].offset + active);
+        logger.info("  Breakpoint line: " + j + " at memory offset: " + func.lines[j].offset + active);
       }
     }
   }
@@ -2256,14 +2278,14 @@ function evalCommand(event)
 
   if (!input)
   {
-    evalLogger.err("Invalid command");
+    evalLogger.error("Invalid command");
     env.evalInput.val('');
     return true;
   }
 
   if (!client.debuggerObj)
   {
-    evalLogger.err("Debugger is NOT connected");
+    evalLogger.error("Debugger is NOT connected");
 
     env.evalInput.val('');
     return true;
@@ -2275,7 +2297,7 @@ function evalCommand(event)
   }
   else
   {
-    evalLogger.err("Invalid command");
+    evalLogger.error("Invalid command");
   }
 
   env.evalInput.val('');
