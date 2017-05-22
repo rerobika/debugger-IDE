@@ -45,7 +45,7 @@ var env = {
   numberOfHiddenPanel : 0,
   isBacktracePanelActive : true,
   isContActive : true,
-  evalInput : $("#eval-input"),
+  commandInput : $("#command-line-input"),
   clBacktrace : false,
 };
 
@@ -2265,41 +2265,147 @@ function DebuggerClient(address)
   }
 }
 
-function evalCommand(event)
+/**
+* Command line functionality.
+*
+* @param {keyboardEvent} event
+*/
+function debuggerCommand(event)
 {
   if (event.keyCode != 13)
   {
     return true;
   }
-
-  var input = env.evalInput.val().trim();
-
-  input = /^([a-zA-Z]+)(?:\s+([^\s].*)|)$/.exec(input);
-
-  if (!input)
+  var command = env.commandInput.val().trim();
+  args = /^([a-zA-Z]+)(?:\s+([^\s].*)|)$/.exec(command);
+  if (!args)
   {
-    evalLogger.error("Invalid command");
-    env.evalInput.val('');
+    logger.error("Invalid command");
+    env.commandInput.val("");
     return true;
   }
-
+  if (!args[2])
+  {
+    args[2] = "";
+  }
+  if (args[1] == "help")
+  {
+    logger.info("Debugger commands:\n" +
+                "  connect <IP address:PORT> - connect to server (default is localhost:5001)\n" +
+                "  break|b <file_name:line>|<function_name> - set breakpoint\n" +
+                "  fbreak <file_name:line>|<function_name> - set breakpoint if not found, add to pending list\n" +
+                "  delete|d <id> - delete breakpoint\n" +
+                "  pendingdel <id> - delete pending breakpoint\n" +
+                "  list - list breakpoints\n" +
+                "  continue|c - continue execution\n" +
+                "  step|s - step-in execution\n" +
+                "  next|n - execution until the next breakpoint\n" +
+                "  eval|e - evaluate expression\n" +
+                "  backtrace|bt <max-depth> - get backtrace\n" +
+                "  src - print current source code\n" +
+                "  dump - dump all breakpoint data");
+    env.commandInput.val("");
+    return true;
+  }
+  if (args[1] == "connect")
+  {
+    if (client.debuggerObj)
+    {
+      logger.info("Debugger is connected");
+      return true;
+    }
+    var ipAddr = args[2];
+    var PORT = "5001";
+    if (ipAddr == "")
+    {
+      ipAddr = "localhost";
+    }
+    if (ipAddr.match(/.*:\d/))
+    {
+      var fields = ipAddr.split(":");
+      ipAddr = fields[0];
+      PORT = fields[1];
+    }
+    var address = ipAddr + ":" + PORT;
+    logger.info("Connect to: " + address);
+    client.debuggerObj = new DebuggerClient(address);
+    env.commandInput.val("");
+    return true;
+  }
   if (!client.debuggerObj)
   {
-    evalLogger.error("Debugger is NOT connected");
-
-    env.evalInput.val('');
+    logger.error("Debugger is NOT connected");
+    env.commandInput.val("");
     return true;
   }
-
-  if (input[1] === "e" || input[1] === "eval")
+  switch(args[1])
   {
-    client.debuggerObj.sendEval(input[2]);
+    case "b":
+    case "break":
+      client.debuggerObj.setBreakpoint(args[2], false);
+      break;
+    case "fbreak":
+      client.debuggerObj.setBreakpoint(args[2], true);
+      break;
+    case "d":
+    case "delete":
+      client.debuggerObj.deleteBreakpoint(args[2]);
+      break;
+    case "pendingdel":
+      client.debuggerObj.deletePendingBreakpoint(args[2]);
+    case "st":
+    case "stop":
+      client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_STOP ]);
+      break;
+    case "c":
+    case "continue":
+      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_CONTINUE);
+      break;
+    case "s":
+    case "step":
+      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_STEP);
+      break;
+    case "n":
+    case "next":
+      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_NEXT);
+      break;
+    case "e":
+    case "eval":
+      client.debuggerObj.sendEval(args[2]);
+      break;
+    case "bt":
+    case "backtrace":
+      max_depth = 0;
+      if (args[2])
+      {
+        if (/[1-9][0-9]*/.exec(args[2]))
+        {
+          max_depth = parseInt(args[2]);
+        }
+        else
+        {
+          logger.error("Invalid maximum depth argument.");
+          break;
+        }
+      }
+      client.debuggerObj.sendGetBacktrace(max_depth);
+      break;
+    case "exception":
+      client.debuggerObj.sendExceptionConfig(args[2]);
+      break;
+    case "src":
+      client.debuggerObj.printSource();
+      break;
+    case "list":
+      client.debuggerObj.listBreakpoints();
+      break;
+    case "dump":
+      client.debuggerObj.dump();
+      break;
+    default:
+      logger.error("Unknown command: " + args[1]);
+      break;
   }
-  else
-  {
-    evalLogger.error("Invalid command");
-  }
-
-  env.evalInput.val('');
+  env.commandInput.val("");
   return true;
 }

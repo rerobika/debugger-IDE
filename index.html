@@ -267,10 +267,6 @@
                 <label for="console-PanelSwitch">Console panel</label>
                 <input type="checkbox" id="console-PanelSwitch" class="panel-switch" checked>
               </div>
-              <div class="control-item">
-                <label for="eval-PanelSwitch">Eval panel</label>
-                <input type="checkbox" id="eval-PanelSwitch" class="panel-switch" checked>
-              </div>
             </div>
           </div>
           <div class="panel panel-default">
@@ -357,36 +353,23 @@
           </div>
         </div>
 
-        <!-- Console log-->
+        <!-- Console -->
         <div class="row" id="console-wrapper">
           <div class="col-md-12">
             <div class="panel panel-default">
               <div class="panel-heading">
-                Console log
+                Console
               </div>
               <div class="panel-body console">
                 <div id="console-panel" class="default-panel-content"></div>
+              </div>
+              <div class="panel-footer">
+                <input type="text" class="form-control" id="command-line-input" onkeypress="debuggerCommand(event); return true;" placeholder="Command line">
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Eval -->
-        <div class="row" id="eval-wrapper">
-          <div class="col-md-12">
-            <div class="panel panel-default">
-              <div class="panel-heading">
-                Eval
-              </div>
-              <div class="panel-body eval">
-                <div id="eval-panel" class="default-panel-content"></div>
-              </div>
-              <div class="panel-footer">
-                <input type="text" class="form-control" id="eval-input" onkeypress="evalCommand(event); return true;" placeholder="eval input">
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Editor -->

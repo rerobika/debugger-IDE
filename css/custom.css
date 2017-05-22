@@ -241,7 +241,7 @@ div.file-tabs a.unsaved {
 #info-panels .panel .panel-body .default-panel-content {
   position: relative;
   width: 100%;
-  height: 100px;
+  height: 175px;
   display: block;
   overflow-y: scroll;
   resize: vertical;
@@ -310,45 +310,38 @@ div.file-tabs a.unsaved {
 }
 
 /*
-Console,
-Eval console
+* Console
 */
-.console .default-panel-content {
-  min-height: 200px !important;
-}
-
-.console .default-panel-content,
-.eval .default-panel-content {
-  padding: 5px;
-}
-
-#eval-input {
+#command-line-input {
   width: 100%;
 }
 
-.console #console-panel span,
-.eval #eval-panel span {
+.console .default-panel-content {
+  min-height: 205px !important;
+}
+
+.console .default-panel-content {
+  padding: 5px;
+}
+
+.console #console-panel span {
   display: block;
   margin: 0;
   padding: 0;
 }
 
-.console #console-panel .log-info,
-.eval #eval-panel .log-info {
+.console #console-panel .log-info {
   color: #000;
 }
 
-.console #console-panel .log-warning,
-.eval #eval-panel .log-warning {
+.console #console-panel .log-warning {
   color: #e65c00;
 }
 
-.console #console-panel .log-error,
-.eval #eval-panel .log-error {
+.console #console-panel .log-error {
   color: #ff1a1a;
 }
 
-.console #console-panel .log-debug,
-.eval #eval-panel .log-debug {
+.console #console-panel .log-debug {
   color: #595959;
 }
