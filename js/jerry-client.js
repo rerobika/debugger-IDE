@@ -1,35 +1,45 @@
-var JERRY_DEBUGGER_CONFIGURATION = 1;
-var JERRY_DEBUGGER_PARSE_ERROR = 2;
-var JERRY_DEBUGGER_BYTE_CODE_CP = 3;
-var JERRY_DEBUGGER_PARSE_FUNCTION = 4;
-var JERRY_DEBUGGER_BREAKPOINT_LIST = 5;
-var JERRY_DEBUGGER_BREAKPOINT_OFFSET_LIST = 6;
-var JERRY_DEBUGGER_SOURCE_CODE = 7;
-var JERRY_DEBUGGER_SOURCE_CODE_END = 8;
-var JERRY_DEBUGGER_SOURCE_CODE_NAME = 9;
-var JERRY_DEBUGGER_SOURCE_CODE_NAME_END = 10;
-var JERRY_DEBUGGER_FUNCTION_NAME = 11;
-var JERRY_DEBUGGER_FUNCTION_NAME_END = 12;
-var JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP = 13;
-var JERRY_DEBUGGER_BREAKPOINT_HIT = 14;
-var JERRY_DEBUGGER_EXCEPTION_HIT = 15;
-var JERRY_DEBUGGER_BACKTRACE = 16;
-var JERRY_DEBUGGER_BACKTRACE_END = 17;
-var JERRY_DEBUGGER_EVAL_RESULT = 18;
-var JERRY_DEBUGGER_EVAL_RESULT_END = 19;
-var JERRY_DEBUGGER_EVAL_ERROR = 20;
-var JERRY_DEBUGGER_EVAL_ERROR_END = 21;
+/**
+*   Packages sent by the server to the client.
+*/
+const ServerPackageType = {
+  JERRY_DEBUGGER_CONFIGURATION : 1,
+  JERRY_DEBUGGER_PARSE_ERROR : 2,
+  JERRY_DEBUGGER_BYTE_CODE_CP : 3,
+  JERRY_DEBUGGER_PARSE_FUNCTION : 4,
+  JERRY_DEBUGGER_BREAKPOINT_LIST : 5,
+  JERRY_DEBUGGER_BREAKPOINT_OFFSET_LIST : 6,
+  JERRY_DEBUGGER_SOURCE_CODE : 7,
+  JERRY_DEBUGGER_SOURCE_CODE_END : 8,
+  JERRY_DEBUGGER_SOURCE_CODE_NAME : 9,
+  JERRY_DEBUGGER_SOURCE_CODE_NAME_END : 10,
+  JERRY_DEBUGGER_FUNCTION_NAME : 11,
+  JERRY_DEBUGGER_FUNCTION_NAME_END : 12,
+  JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP : 13,
+  JERRY_DEBUGGER_BREAKPOINT_HIT : 14,
+  JERRY_DEBUGGER_EXCEPTION_HIT : 15,
+  JERRY_DEBUGGER_BACKTRACE : 16,
+  JERRY_DEBUGGER_BACKTRACE_END : 17,
+  JERRY_DEBUGGER_EVAL_RESULT : 18,
+  JERRY_DEBUGGER_EVAL_RESULT_END : 19,
+  JERRY_DEBUGGER_EVAL_ERROR : 20,
+  JERRY_DEBUGGER_EVAL_ERROR_END : 21
+};
 
-var JERRY_DEBUGGER_FREE_BYTE_CODE_CP = 1;
-var JERRY_DEBUGGER_UPDATE_BREAKPOINT = 2;
-var JERRY_DEBUGGER_EXCEPTION_CONFIG = 3;
-var JERRY_DEBUGGER_STOP = 4;
-var JERRY_DEBUGGER_CONTINUE = 5;
-var JERRY_DEBUGGER_STEP = 6;
-var JERRY_DEBUGGER_NEXT = 7;
-var JERRY_DEBUGGER_GET_BACKTRACE = 8;
-var JERRY_DEBUGGER_EVAL = 9;
-var JERRY_DEBUGGER_EVAL_PART = 10;
+/**
+* Packages sent by the client to the server.
+*/
+const ClientPackageType = {
+  JERRY_DEBUGGER_FREE_BYTE_CODE_CP : 1,
+  JERRY_DEBUGGER_UPDATE_BREAKPOINT : 2,
+  JERRY_DEBUGGER_EXCEPTION_CONFIG : 3,
+  JERRY_DEBUGGER_STOP : 4,
+  JERRY_DEBUGGER_CONTINUE : 5,
+  JERRY_DEBUGGER_STEP : 6,
+  JERRY_DEBUGGER_NEXT : 7,
+  JERRY_DEBUGGER_GET_BACKTRACE : 8,
+  JERRY_DEBUGGER_EVAL : 9,
+  JERRY_DEBUGGER_EVAL_PART : 10
+};
 
 var client = {
   socket : null,
@@ -150,8 +160,8 @@ Logger.prototype.error = function(message) {
 };
 
 /**
-* Appends the given data or button into the panel
-* as a debug information in JSON format.
+* Appends the given data into the panel
+* as a debug information in JSON format, or puts a button into it.
 *
 * @param {mixed} data
 * @param {boolean} button
@@ -292,7 +302,7 @@ function getbacktrace()
     }
   }
 
-  client.debuggerObj.encodeMessage("BI", [ JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
+  client.debuggerObj.encodeMessage("BI", [ ClientPackageType.JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
 }
 
 function highlightCurrentLine(lineNumber) {
@@ -1015,12 +1025,12 @@ $(document).ready(function()
     if (env.isContActive)
     {
       updateContinueStopButton(button.stop);
-      client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_CONTINUE ]);
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_CONTINUE ]);
     }
     else
     {
       updateContinueStopButton(button.continue);
-      client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_STOP ]);
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
     }
   });
 
@@ -1031,7 +1041,7 @@ $(document).ready(function()
       return true;
     }
 
-    client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_STEP ]);
+    client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STEP ]);
   });
 
   $("#next-button").on("click", function()
@@ -1041,7 +1051,7 @@ $(document).ready(function()
       return true;
     }
 
-    client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_NEXT ]);
+    client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
   });
 
   /*
@@ -1234,7 +1244,7 @@ function DebuggerClient(address)
 
     var result = new Uint8Array(byteLength + 1 + 4);
 
-    result[0] = JERRY_DEBUGGER_EVAL;
+    result[0] = ClientPackageType.JERRY_DEBUGGER_EVAL;
 
     setUint32(result, 1, byteLength);
 
@@ -1529,7 +1539,7 @@ function DebuggerClient(address)
 
     delete functions[byte_code_cp];
 
-    message[0] = JERRY_DEBUGGER_FREE_BYTE_CODE_CP;
+    message[0] = ClientPackageType.JERRY_DEBUGGER_FREE_BYTE_CODE_CP;
     client.socket.send(message);
   }
 
@@ -1590,45 +1600,45 @@ function DebuggerClient(address)
     {
       switch (message[0])
       {
-        case JERRY_DEBUGGER_PARSE_ERROR:
+        case ServerPackageType.JERRY_DEBUGGER_PARSE_ERROR:
         {
           /* Parse error occured in JerryScript. */
           parseObj = null;
           return;
         }
 
-        case JERRY_DEBUGGER_SOURCE_CODE:
-        case JERRY_DEBUGGER_SOURCE_CODE_END:
+        case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE:
+        case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_END:
         {
           sourceData = concatUint8Arrays(sourceData, message);
 
-          if (message[0] == JERRY_DEBUGGER_SOURCE_CODE_END)
+          if (message[0] == ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_END)
           {
             source = cesu8ToString(sourceData);
           }
           return;
         }
 
-        case JERRY_DEBUGGER_SOURCE_CODE_NAME:
-        case JERRY_DEBUGGER_SOURCE_CODE_NAME_END:
+        case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_NAME:
+        case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_NAME_END:
         {
           sourceNameData = concatUint8Arrays(sourceNameData, message);
 
-          if (message[0] == JERRY_DEBUGGER_SOURCE_CODE_NAME_END)
+          if (message[0] == ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_NAME_END)
           {
             sourceName = cesu8ToString(sourceNameData);
           }
           return;
         }
 
-        case JERRY_DEBUGGER_FUNCTION_NAME:
-        case JERRY_DEBUGGER_FUNCTION_NAME_END:
+        case ServerPackageType.JERRY_DEBUGGER_FUNCTION_NAME:
+        case ServerPackageType.JERRY_DEBUGGER_FUNCTION_NAME_END:
         {
           functionName = concatUint8Arrays(functionName, message);
           return;
         }
 
-        case JERRY_DEBUGGER_PARSE_FUNCTION:
+        case ServerPackageType.JERRY_DEBUGGER_PARSE_FUNCTION:
         {
           position = decodeMessage("II", message, 1);
 
@@ -1644,8 +1654,8 @@ function DebuggerClient(address)
           return;
         }
 
-        case JERRY_DEBUGGER_BREAKPOINT_LIST:
-        case JERRY_DEBUGGER_BREAKPOINT_OFFSET_LIST:
+        case ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_LIST:
+        case ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_OFFSET_LIST:
         {
           var array;
 
@@ -1654,7 +1664,7 @@ function DebuggerClient(address)
             abortConnection("message too short.");
           }
 
-          if (message[0] == JERRY_DEBUGGER_BREAKPOINT_LIST)
+          if (message[0] == ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_LIST)
           {
             array = stack[stack.length - 1].lines;
           }
@@ -1670,7 +1680,7 @@ function DebuggerClient(address)
           return;
         }
 
-        case JERRY_DEBUGGER_BYTE_CODE_CP:
+        case ServerPackageType.JERRY_DEBUGGER_BYTE_CODE_CP:
         {
           var func = stack.pop();
           func.byte_code_cp = decodeMessage("C", message, 1)[0];
@@ -1704,7 +1714,7 @@ function DebuggerClient(address)
           break;
         }
 
-        case JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP:
+        case ServerPackageType.JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP:
         {
           var byte_code_cp = decodeMessage("C", message, 1)[0];
 
@@ -1772,7 +1782,7 @@ function DebuggerClient(address)
 
     if (cpointerSize == 0)
     {
-      if (message[0] != JERRY_DEBUGGER_CONFIGURATION
+      if (message[0] != ServerPackageType.JERRY_DEBUGGER_CONFIGURATION
           || message.byteLength != 4)
       {
         abortConnection("the first message must be configuration.");
@@ -1799,36 +1809,36 @@ function DebuggerClient(address)
 
     switch (message[0])
     {
-      case JERRY_DEBUGGER_PARSE_ERROR:
-      case JERRY_DEBUGGER_BYTE_CODE_CP:
-      case JERRY_DEBUGGER_PARSE_FUNCTION:
-      case JERRY_DEBUGGER_BREAKPOINT_LIST:
-      case JERRY_DEBUGGER_SOURCE_CODE:
-      case JERRY_DEBUGGER_SOURCE_CODE_END:
-      case JERRY_DEBUGGER_SOURCE_CODE_NAME:
-      case JERRY_DEBUGGER_SOURCE_CODE_NAME_END:
-      case JERRY_DEBUGGER_FUNCTION_NAME:
-      case JERRY_DEBUGGER_FUNCTION_NAME_END:
+      case ServerPackageType.JERRY_DEBUGGER_PARSE_ERROR:
+      case ServerPackageType.JERRY_DEBUGGER_BYTE_CODE_CP:
+      case ServerPackageType.JERRY_DEBUGGER_PARSE_FUNCTION:
+      case ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_LIST:
+      case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE:
+      case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_END:
+      case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_NAME:
+      case ServerPackageType.JERRY_DEBUGGER_SOURCE_CODE_NAME_END:
+      case ServerPackageType.JERRY_DEBUGGER_FUNCTION_NAME:
+      case ServerPackageType.JERRY_DEBUGGER_FUNCTION_NAME_END:
       {
         parseObj = new ParseSource()
         parseObj.receive(message)
         return;
       }
 
-      case JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP:
+      case ServerPackageType.JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP:
       {
         releaseFunction(message);
         return;
       }
 
-      case JERRY_DEBUGGER_BREAKPOINT_HIT:
-      case JERRY_DEBUGGER_EXCEPTION_HIT:
+      case ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_HIT:
+      case ServerPackageType.JERRY_DEBUGGER_EXCEPTION_HIT:
       {
         var breakpointData = decodeMessage("CI", message, 1);
         var breakpointRef = getBreakpoint(breakpointData);
         var breakpoint = breakpointRef.breakpoint;
 
-        if (message[0] == JERRY_DEBUGGER_EXCEPTION_HIT)
+        if (message[0] == ServerPackageType.JERRY_DEBUGGER_EXCEPTION_HIT)
         {
           logger.info("Exception throw detected");
         }
@@ -1899,8 +1909,8 @@ function DebuggerClient(address)
         return;
       }
 
-      case JERRY_DEBUGGER_BACKTRACE:
-      case JERRY_DEBUGGER_BACKTRACE_END:
+      case ServerPackageType.JERRY_DEBUGGER_BACKTRACE:
+      case ServerPackageType.JERRY_DEBUGGER_BACKTRACE_END:
       {
         util.clearElement($("#backtrace-content"));
         for (var i = 1; i < message.byteLength; i += cpointerSize + 4)
@@ -1914,28 +1924,28 @@ function DebuggerClient(address)
           ++backtraceFrame;
         }
 
-        if (message[0] == JERRY_DEBUGGER_BACKTRACE_END)
+        if (message[0] == ServerPackageType.JERRY_DEBUGGER_BACKTRACE_END)
         {
           backtraceFrame = 0;
         }
         return;
       }
 
-      case JERRY_DEBUGGER_EVAL_RESULT:
-      case JERRY_DEBUGGER_EVAL_RESULT_END:
-      case JERRY_DEBUGGER_EVAL_ERROR:
-      case JERRY_DEBUGGER_EVAL_ERROR_END:
+      case ServerPackageType.JERRY_DEBUGGER_EVAL_RESULT:
+      case ServerPackageType.JERRY_DEBUGGER_EVAL_RESULT_END:
+      case ServerPackageType.JERRY_DEBUGGER_EVAL_ERROR:
+      case ServerPackageType.JERRY_DEBUGGER_EVAL_ERROR_END:
       {
         env.evalResult = concatUint8Arrays(env.evalResult, message);
 
-        if (message[0] == JERRY_DEBUGGER_EVAL_RESULT_END)
+        if (message[0] == ServerPackageType.JERRY_DEBUGGER_EVAL_RESULT_END)
         {
           evalLogger.info(cesu8ToString(env.evalResult));
           env.evalResult = null;
           return;
         }
 
-        if (message[0] == JERRY_DEBUGGER_EVAL_ERROR_END)
+        if (message[0] == ServerPackageType.JERRY_DEBUGGER_EVAL_ERROR_END)
         {
           evalLogger.error("Uncaught exception: " + cesu8ToString(env.evalResult));
           env.evalResult = null;
@@ -1961,7 +1971,7 @@ function DebuggerClient(address)
       activeBreakpoints[nextBreakpointIndex] = breakpoint;
       nextBreakpointIndex++;
 
-      var values = [ JERRY_DEBUGGER_UPDATE_BREAKPOINT,
+      var values = [ ClientPackageType.JERRY_DEBUGGER_UPDATE_BREAKPOINT,
                      1,
                      breakpoint.func.byte_code_cp,
                      breakpoint.offset ];
@@ -2050,7 +2060,7 @@ function DebuggerClient(address)
       return;
     }
 
-    encodeMessage("BB", [ JERRY_DEBUGGER_EXCEPTION_CONFIG, enable ]);
+    encodeMessage("BB", [ ClientPackageType.JERRY_DEBUGGER_EXCEPTION_CONFIG, enable ]);
   }
 
   this.deleteBreakpoint = function(index)
@@ -2084,7 +2094,7 @@ function DebuggerClient(address)
     delete activeBreakpoints[index];
     breakpoint.activeIndex = -1;
 
-    var values = [ JERRY_DEBUGGER_UPDATE_BREAKPOINT,
+    var values = [ ClientPackageType.JERRY_DEBUGGER_UPDATE_BREAKPOINT,
                    0,
                    breakpoint.func.byte_code_cp,
                    breakpoint.offset ];
@@ -2157,7 +2167,7 @@ function DebuggerClient(address)
       return;
     }
 
-    encodeMessage("BI", [ JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
+    encodeMessage("BI", [ ClientPackageType.JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
 
     logger.info("Backtrace:");
   }
@@ -2191,7 +2201,7 @@ function DebuggerClient(address)
 
     while (offset < byteLength)
     {
-      array[offset] = JERRY_DEBUGGER_EVAL_PART;
+      array[offset] = ClientPackageType.JERRY_DEBUGGER_EVAL_PART;
       client.socket.send(array.slice(offset, offset + maxMessageSize));
       offset += maxMessageSize - 1;
     }
@@ -2361,19 +2371,19 @@ function debuggerCommand(event)
       client.debuggerObj.deletePendingBreakpoint(args[2]);
     case "st":
     case "stop":
-      client.debuggerObj.encodeMessage("B", [ JERRY_DEBUGGER_STOP ]);
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
       break;
     case "c":
     case "continue":
-      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_CONTINUE);
+      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_CONTINUE);
       break;
     case "s":
     case "step":
-      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_STEP);
+      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_STEP);
       break;
     case "n":
     case "next":
-      client.debuggerObj.sendResumeExec(JERRY_DEBUGGER_NEXT);
+      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_NEXT);
       break;
     case "e":
     case "eval":
