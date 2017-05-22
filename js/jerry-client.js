@@ -1068,6 +1068,7 @@ function DebuggerClient(address)
   var lastBreakpointHit = null;
   var activeBreakpoints = { };
   var nextBreakpointIndex = 1;
+  var pendingBreakpoints = [ ];
   var backtraceFrame = 0;
   var evalResult = null;
 
@@ -1489,37 +1490,37 @@ function DebuggerClient(address)
 
   function getBreakpoint(breakpointData)
   {
-      var returnValue = {};
-      var func = functions[breakpointData[0]];
-      var offset = breakpointData[1];
+    var returnValue = {};
+    var func = functions[breakpointData[0]];
+    var offset = breakpointData[1];
 
-      if (offset in functions)
-      {
-        returnValue.breakpoint = func.offsets[offset];
-        returnValue.at = true;
-        return returnValue;
-      }
-
-      if (offset < functions.firstBreakpointOffset)
-      {
-        returnValue.breakpoint = func.offsets[firstBreakpointOffset];
-        returnValue.at = true;
-        return returnValue;
-      }
-
-      nearest_offset = -1;
-
-      for (var current_offset in func.offsets)
-      {
-        if ((current_offset <= offset) && (current_offset > nearest_offset))
-        {
-          nearest_offset = current_offset;
-        }
-      }
-
-      returnValue.breakpoint = func.offsets[nearest_offset];
-      returnValue.at = false;
+    if (offset in func.offsets)
+    {
+      returnValue.breakpoint = func.offsets[offset];
+      returnValue.at = true;
       return returnValue;
+    }
+
+    if (offset < func.firstBreakpointOffset)
+    {
+      returnValue.breakpoint = func.offsets[func.firstBreakpointOffset];
+      returnValue.at = true;
+      return returnValue;
+    }
+
+    nearest_offset = -1;
+
+    for (var current_offset in func.offsets)
+    {
+      if ((current_offset <= offset) && (current_offset > nearest_offset))
+      {
+        nearest_offset = current_offset;
+      }
+    }
+
+    returnValue.breakpoint = func.offsets[nearest_offset];
+    returnValue.at = false;
+    return returnValue;
   }
 
   this.encodeMessage = encodeMessage;
@@ -1690,6 +1691,25 @@ function DebuggerClient(address)
         {
           lineList.insert(j, func);
         }
+      }
+
+      if (pendingBreakpoints.length != 0)
+      {
+        logger.log("Available pending breakpoints");
+
+        for (var i in pendingBreakpoints)
+        {
+          if (Number.isInteger(pendingBreakpoints[i]))
+          {
+            pendingBreakpoints[i] = sourceName + ":" + pendingBreakpoints[i];
+          }
+          logger.log("Try to add: " + pendingBreakpoints[i]);
+          client.debuggerObj.setBreakpoint(pendingBreakpoints[i], false);
+        }
+      }
+      else
+      {
+        appendLog("No pending breakpoints");
       }
 
       parseObj = null;
@@ -1908,7 +1928,7 @@ function DebuggerClient(address)
     updateBreakpointsPanel();
   }
 
-  this.setBreakpoint = function(str)
+  this.setBreakpoint = function(str, pending)
   {
     line = /^(.+):([1-9][0-9]*)$/.exec(str);
     var found = false;
@@ -1947,6 +1967,19 @@ function DebuggerClient(address)
     if (!found)
     {
       logger.log("Breakpoint not found");
+      if (pending)
+      {
+        if (line)
+        {
+          pendingBreakpoints.push(Number(line[2]));
+          logger.log("Pending breakpoint index: " + line[0] + " added");
+        }
+        else
+        {
+          pendingBreakpoints.push(str);
+          logger.log("Pending breakpoint function name: " + str + " added");
+        }
+      }
     }
   }
 
@@ -2016,6 +2049,19 @@ function DebuggerClient(address)
     logger.log("Breakpoint " + index + " is deleted.");
   }
 
+  this.deletePendingBreakpoint = function(index)
+  {
+    if (index >= pendingBreakpoints.length)
+    {
+      logger.log("Pending breakpoint not found");
+    }
+    else
+    {
+      pendingBreakpoints.splice(index, 1);
+      logger.log("Pending breakpoint " + index + " is deleted.");
+    }
+  }
+
   this.listBreakpoints = function()
   {
     logger.log("List of active breakpoints:");
@@ -2030,6 +2076,18 @@ function DebuggerClient(address)
     if (!found)
     {
       logger.log("  no active breakpoints");
+    }
+
+    if (pendingBreakpoints.length != 0)
+    {
+      logger.log("List of pending breakpoints:");
+      for (var i in pendingBreakpoints)
+      {
+        logger.log("  pending breakpoint " + i + " at " + pendingBreakpoints[i]);
+      }
+    }
+    else {
+      logger.log("No pending breakpoints");
     }
   }
 
