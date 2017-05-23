@@ -52,11 +52,16 @@ var env = {
   evalResult : null,
   breakpointIds : [],
   lastBreakpoint : null,
-  numberOfHiddenPanel : 0,
   isBacktracePanelActive : true,
   isContActive : true,
   commandInput : $("#command-line-input"),
   clBacktrace : false,
+};
+
+var layout = {
+  numberOfHiddenPanel : 0,
+  lastKnownTargetCol : 6,
+  lastKnownNextCol : 6
 };
 
 var button = {
@@ -197,7 +202,7 @@ function disableButtons(disable)
     $("#host-address").removeAttr("disabled");
 
     // Disable the debugger buttons.
-    $(".debugger-buttons .btn-warning").addClass("disabled");
+    $(".debugger-buttons .btn-default").addClass("disabled");
   }
   else
   {
@@ -206,7 +211,7 @@ function disableButtons(disable)
     $("#host-address").attr("disabled", true);
 
     // Enable the debugger buttons.
-    $(".debugger-buttons .btn-warning").removeClass("disabled");
+    $(".debugger-buttons .btn-default").removeClass("disabled");
   }
 }
 
@@ -650,6 +655,7 @@ function closeTab(id)
 $(document).ready(function()
 {
   // Init the ACE editor.
+  env.editor.resize();
   env.editor.setTheme("ace/theme/chrome");
   var JavaScriptMode = ace.require("ace/mode/javascript").Mode;
   env.EditSession = ace.require("ace/edit_session").EditSession;
@@ -666,9 +672,11 @@ $(document).ready(function()
   /*
   * Editor settings toggle button event.
   */
-  $("#editor-settings-button").on("change", function()
+  $("#settings-button").on("click", function()
   {
-    $(".control-panel-wrapper").toggleClass("block-control-panel-wrapper");
+    $("#settings-wrapper").toggleClass("displayed");
+    $("#workspace-wrapper").toggleClass("hidden");
+    $("#settings-button").toggleClass("active");
   });
 
   /*
@@ -911,7 +919,7 @@ $(document).ready(function()
         env.isBacktracePanelActive = true;
       }
       $("#" + panel + "-wrapper").show();
-      env.numberOfHiddenPanel--;
+      layout.numberOfHiddenPanel--;
     }
     else
     {
@@ -920,21 +928,25 @@ $(document).ready(function()
         env.isBacktracePanelActive = false;
       }
       $("#" + panel + "-wrapper").hide();
-      env.numberOfHiddenPanel++;
+      layout.numberOfHiddenPanel++;
     }
 
-    if (env.numberOfHiddenPanel < $("#info-panels").children().length)
+    // If every information panels are hidden then expand the editor.
+    // -1 from the length because of the resizable div element.
+    if (layout.numberOfHiddenPanel == $("#info-panels").children().length - 1)
     {
-      $("#editor-wrapper").removeClass("col-md-12");
-      $("#editor-wrapper").addClass("col-md-6");
-      $("#info-panels").show();
-      env.editor.resize()
-    }
-    else
-    {
-      $("#editor-wrapper").removeClass("col-md-6");
+      $("#editor-wrapper").removeClass();
       $("#editor-wrapper").addClass("col-md-12");
       $("#info-panels").hide();
+      env.editor.resize()
+
+    // If there is at least one information panel then reset the last known layout.
+  } else if (layout.numberOfHiddenPanel > 0 && !$("#info-panels").is(":visible")) {
+      $("#editor-wrapper").removeClass();
+      $("#editor-wrapper").addClass("col-md-" + layout.lastKnownNextCol + " resizable");
+      $("#info-panels").removeClass();
+      $("#info-panels").addClass("col-md-" + layout.lastKnownTargetCol + " resizable");
+      $("#info-panels").show();
       env.editor.resize()
     }
   });
@@ -1000,19 +1012,21 @@ $(document).ready(function()
   */
   $("#delete-all-button").on("click", function()
   {
-    var found = false;
+    if (client.debuggerObj) {
+      var found = false;
 
-    for (var i in client.debuggerObj.activeBreakpoints)
-    {
-      delete client.debuggerObj.activeBreakpoints[i];
-      found = true;
-    }
+      for (var i in client.debuggerObj.activeBreakpoints)
+      {
+        delete client.debuggerObj.activeBreakpoints[i];
+        found = true;
+      }
 
-    if (!found)
-    {
-      logger.info("No active breakpoints.")
+      if (!found)
+      {
+        logger.info("No active breakpoints.")
+      }
+      deleteBreakpointsFromEditor();
     }
-    deleteBreakpointsFromEditor();
   });
 
   $("#continue-stop-button").on("click", function()
@@ -1099,6 +1113,61 @@ $(document).ready(function()
 
       e.stop();
     }
+  });
+});
+
+/**
+* Bootstrap column resizer.
+*/
+$(function() {
+  var resizableEl = $('.resizable').not(':last-child');
+  // This is filled by start event handler.
+  var totalCol;
+  var updateClass = function(el, col) {
+    // Remove width, our class already has it.
+    el.css('width', '');
+    el.removeClass(function(index, className) {
+      return (className.match(/(^|\s)col-\S+/g) || []).join(' ');
+    }).addClass('col-md-' + col);
+  };
+
+  function getColumnWidth() {
+    return $(document).width() / 12;
+  }
+
+  // jQuery UI Resizable
+  resizableEl.resizable({
+    handles: 'e',
+    start: function(event, ui) {
+      var target = ui.element;
+      var next = target.next();
+      var targetCol = Math.round(target.width() / getColumnWidth());
+      var nextCol = Math.round(next.width() / getColumnWidth());
+      // Set totalColumns globally
+      totalCol = targetCol + nextCol;
+      target.resizable('option', 'minWidth', getColumnWidth());
+      target.resizable('option', 'maxWidth', ((totalCol - 1) * getColumnWidth()));
+    },
+    resize: function(event, ui) {
+      var target = ui.element;
+      var next = target.next();
+      var targetColumnCount = Math.round(target.width() / getColumnWidth());
+      var nextColumnCount = Math.round(next.width() / getColumnWidth());
+      var targetSet = totalCol - nextColumnCount;
+      var nextSet = totalCol - targetColumnCount;
+
+      // Conditions for min and max column number.
+      if (targetSet < 4) targetSet = 4;
+      if (targetSet > 8) targetSet = 8;
+      if (nextSet < 4) nextSet = 4;
+      if (nextSet > 8) nextSet = 8;
+      // Store the calculated column numbers.
+      layout.lastKnownTargetCol = targetSet;
+      layout.lastKnownNextCol = nextSet;
+      // Refresh the columns.
+      updateClass(target, targetSet);
+      updateClass(next, nextSet);
+    },
   });
 });
 
