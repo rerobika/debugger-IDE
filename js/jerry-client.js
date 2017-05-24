@@ -722,7 +722,7 @@ $(document).ready(function()
   /*
   * Editor settings toggle button event.
   */
-  $("#settings-button").on("click", function()
+  $(".settings-toggle").on("click", function()
   {
     $("#settings-wrapper").toggleClass("displayed");
     $("#workspace-wrapper").toggleClass("hidden");

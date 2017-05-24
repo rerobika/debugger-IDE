@@ -37,7 +37,7 @@ h1, h2, h3, h4 {
 }
 
 .data {
-  white-space: pre-line;
+  white-space: pre;
 }
 
 .form-control {
@@ -88,6 +88,18 @@ input[type="number"] {
 /**
 * Settings
 */
+#settings-wrapper .settings-toggle {
+  cursor: pointer;
+}
+
+#settings-wrapper span.settings-toggle {
+  font-size: 18px;
+}
+
+#settings-wrapper span.settings-toggle:hover {
+  color: #23527c;
+}
+
 #settings-wrapper {
   display: none;
 }
