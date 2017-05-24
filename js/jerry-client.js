@@ -75,12 +75,6 @@ var filetab = {
   work : 1,
 };
 
-var session = {
-  nextID : 0,
-  activeID : 0,
-  data : [],
-};
-
 var marker = {
   executed : null,
   lastMarked : null,
@@ -181,9 +175,254 @@ Logger.prototype.debug = function(data, button = false) {
   this.util.scrollDown(this.panel);
 };
 
+
+
+/**
+* Session handler for the editor files.
+*/
+function Session() {
+  this.nextID = 0;
+  this.activeID = 0;
+  this.data = [];
+
+  return this;
+}
+
+/**
+* Returns the current nextID value.
+*
+* @return {integer}
+*/
+Session.prototype.getNextID = function() {
+  return this.nextID;
+};
+
+/**
+* Returns the current activeID value.
+*
+* @return {integer}
+*/
+Session.prototype.getActiveID = function() {
+  return this.activeID;
+};
+
+/**
+* Creates a new session based on the given parameters.
+*
+* @param {string} name The filename.
+* @param {string} data The file content.
+* @param {integer} tab The tab type.
+* @param {boolean} saved The file saved status.
+*/
+Session.prototype.createNewSession = function(name, data, tab, saved) {
+  var saved = saved || true;
+  var tab = tab || filetab.work;
+  // Create a new document for the editor from the trimmed data.
+  var doc = new env.Document(data.trim());
+  // Create a new javascript mode session from the document.
+  var eSession = new env.EditSession(doc, "ace/mode/javascript");
+
+  // Store the edit session.
+  this.data.push({
+    id : ++this.nextID,
+    saved : saved,
+    name : name,
+    editSession : eSession
+  });
+
+  updateFilePanel(this.nextID, name, tab);
+  this.switchSession(this.nextID);
+};
+
+Session.prototype.setWelcomeSession = function() {
+  filetab.isWelcome = true;
+
+  // If this is a fresh start.
+  if (this.getSessionById(0) == null)
+  {
+    var welcome = "/**\n" +
+                  "* JerryScript Remote Debugger WebIDE.\n" +
+                  "*/\n";
+
+    var eSession = new env.EditSession(welcome, "ace/mode/javascript");
+    this.data.push({
+      id: 0,
+      saved : true,
+      name: "welcome.js",
+      editSession: eSession
+    });
+  }
+
+  updateFilePanel(0, "welcome.js", filetab.welcome);
+  this.switchSession(0);
+
+  // Enable the read only mode in the editor.
+  env.editor.setReadOnly(true);
+}
+
+/**
+* Switches the editor session.
+*
+* @param {integer} id The id of the desired session.
+*/
+Session.prototype.switchSession = function(id) {
+  // Select the right tab on the tabs panel.
+  selectTab(id);
+
+  // Marked the selected session as an active sesison.
+  this.activeID = id;
+  // Change the currently session through the editor's API.
+  env.editor.setSession(this.getSessionById(id));
+
+  // Refresh the available breakpoint lines in the editor
+  // based on the new sesison.
+  if (client.debuggerObj &&
+      env.lastBreakpoint != null &&
+      env.lastBreakpoint.func.sourceName.endsWith(session.getSessionNameById(id)))
+  {
+    highlightCurrentLine(env.lastBreakpoint.line);
+  }
+
+  // Disable the read only in the editor.
+  if (env.editor.getReadOnly())
+  {
+    env.editor.setReadOnly(false);
+  }
+
+  // If the there is no connecton then delete the inserted breakpoints.
+  if (!client.debuggerObj)
+  {
+    deleteBreakpointsFromEditor();
+  }
+}
+
+/**
+* Returns a session name based on the given ID.
+*
+* @param {integer} id
+* @return {mixed} Returns the session name as string if exists, null otherwise.
+*/
+Session.prototype.getSessionNameById = function(id) {
+  for (var i in this.data)
+  {
+    if (this.data[i].id == id)
+    {
+      return this.data[i].name;
+    }
+  }
+
+  return null;
+}
+
+/**
+* Returns a id based on the given name.
+*
+* @param {string} name
+* @return {mixed} Returns the session id if exists, null otherwise.
+*/
+Session.prototype.getSessionIdbyName = function(name) {
+  for (var i in this.data)
+  {
+    if (name.endsWith(this.data[i].name))
+    {
+      return this.data[i].id;
+    }
+  }
+
+  return null;
+}
+
+/**
+* Returns an edit session based on the given id.
+*
+* @param {integer} id
+* @return {mixed} Returns the session if exists, null otherwise.
+*/
+Session.prototype.getSessionById = function(id) {
+  for (var i in this.data)
+  {
+    if (this.data[i].id == id)
+    {
+      return this.data[i].editSession;
+    }
+  }
+
+  return null;
+}
+
+/**
+* Removes a session from tha inner array,
+* based on a given attribute identifier and a value pair.
+*
+* @param {string} attr The name of the attribute.
+* @param {mixed} value The value of the attribute.
+*/
+Session.prototype.deleteSessionByAttr = function(attr, value) {
+  var i = this.data.length;
+  while(i--)
+  {
+    if(this.data[i]
+       && this.data[i].hasOwnProperty(attr)
+       && this.data[i][attr] === parseInt(value))
+    {
+      this.data.splice(i,1);
+    }
+  }
+}
+
+/**
+* Returns the left or the right neighbour of a session.
+* This is possible, because we store the sessions "in a straight line".
+* The 0 session is the welcome session.
+*
+* @param {integer} id The base session id.
+* @return {integer} Return the neighbour id if exists one, 0 otherwise.
+*/
+Session.prototype.getSessionNeighbourById = function(id) {
+  for (var i = 1; i < this.data.length; i++)
+  {
+    if (this.data[i].id === parseInt(id))
+    {
+      if (this.data[i - 1] !== undefined && this.data[i - 1].id !== 0)
+      {
+        return this.data[i - 1].id;
+      }
+      if (this.data[i + 1] !== undefined)
+      {
+        return this.data[i + 1].id;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
+* Searches the given name in the stored sessions.
+*
+* @param {string} name The searched session name.
+* @param {boolean} log Disable on enable the result log.
+* @return {boolean} Returns true if the given name is exists, false otherwise.
+*/
+Session.prototype.sessionNameCheck = function(name, log) {
+  var log = log || false;
+  if (this.getSessionIdbyName(name) === null)
+  {
+    if (log)
+    {
+      logger.warning("The " + name + " is missing.");
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 const logger = new Logger($("#console-panel"));
 const evalLogger = new Logger($("#eval-panel"));
 const util = new Util();
+const session = new Session();
 
 /*
 ██████  ██    ██ ████████ ████████  ██████  ███    ██ ███████
@@ -245,7 +484,7 @@ function updateContinueStopButton(value)
 function getLinesFromRawData(raw)
 {
   var lines = [];
-  var sessionName = getSessionNameById(session.activeID);
+  var sessionName = session.getSessionNameById(session.getActiveID());
 
   for (var i in raw)
   {
@@ -379,195 +618,6 @@ function updateBreakpointsPanel()
 }
 
 /*
-███████ ███████ ███████ ███████ ██  ██████  ███    ██
-██      ██      ██      ██      ██ ██    ██ ████   ██
-███████ █████   ███████ ███████ ██ ██    ██ ██ ██  ██
-     ██ ██           ██      ██ ██ ██    ██ ██  ██ ██
-███████ ███████ ███████ ███████ ██  ██████  ██   ████
-*/
-
-function setWelcomeSession()
-{
-  filetab.isWelcome = true;
-
-  // First start.
-  if (getSessionById(0) == null)
-  {
-    var welcome = "/**\n" +
-                  "* JerryScript Remote Debugger WebIDE.\n" +
-                  "*/\n";
-
-    var eSession = new env.EditSession(welcome, "ace/mode/javascript");
-    session.data.push(
-    {
-      id: 0,
-      saved : true,
-      name: "welcome.js",
-      editSession: eSession
-    });
-  }
-
-  updateFilePanel(0, "welcome.js", filetab.welcome);
-  switchSession(0);
-
-  // Enable the read only mode in the editor.
-  env.editor.setReadOnly(true);
-}
-
-function createNewSession(name, data, tab, saved)
-{
-  var saved = saved || true;
-  var tab = tab || filetab.work;
-  var doc = new env.Document(data.trim());
-  var eSession = new env.EditSession(doc, "ace/mode/javascript");
-  // Store the edit session.
-  session.nextID++;
-  session.data.push(
-  {
-    id : session.nextID,
-    saved : saved,
-    name : name,
-    editSession : eSession
-  });
-
-  updateFilePanel(session.nextID, name, tab);
-  switchSession(session.nextID);
-}
-
-function getSessionNameById(id)
-{
-  for (var i in session.data)
-  {
-    if (session.data[i].id == id)
-    {
-      return session.data[i].name;
-    }
-  }
-
-  return null;
-}
-
-function getSessionIdbyName(name)
-{
-  for (var i in session.data)
-  {
-    if (name.endsWith(session.data[i].name))
-    {
-      return session.data[i].id;
-    }
-  }
-
-  return null;
-}
-
-function getSessionById(id)
-{
-  for (var i in session.data)
-  {
-    if (session.data[i].id == id)
-    {
-      return session.data[i].editSession;
-    }
-  }
-
-  return null;
-}
-
-function deleteSessionByAttr(attr, value)
-{
-    var i = session.data.length;
-    while(i--)
-    {
-      if(session.data[i]
-         && session.data[i].hasOwnProperty(attr)
-         && session.data[i][attr] === parseInt(value))
-      {
-        session.data.splice(i,1);
-      }
-    }
-}
-
-function switchSession(id)
-{
-  selectTab(id);
-
-  // Set the session based on id.
-  session.activeID = id;
-  env.editor.setSession(getSessionById(id));
-
-  if (client.debuggerObj &&
-      env.lastBreakpoint != null &&
-      env.lastBreakpoint.func.sourceName.endsWith(getSessionNameById(id)))
-  {
-    highlightCurrentLine(env.lastBreakpoint.line);
-  }
-
-  // Disable the read only mode from the editor.
-  if (env.editor.getReadOnly())
-  {
-    env.editor.setReadOnly(false);
-  }
-
-  if (!client.debuggerObj)
-  {
-    deleteBreakpointsFromEditor();
-  }
-}
-
-function getSessionNeighbourById(id)
-{
-  for (var i = 1; i < session.data.length; i++)
-  {
-    if (session.data[i].id === parseInt(id))
-    {
-      if (session.data[i - 1] !== undefined && session.data[i - 1].id !== 0)
-      {
-        return session.data[i - 1].id;
-      }
-      if (session.data[i + 1] !== undefined)
-      {
-        return session.data[i + 1].id;
-      }
-    }
-  }
-
-  return 0;
-}
-
-function sessionNameCheck(name, log)
-{
-  if (getSessionIdbyName(name) === null)
-  {
-    if (log)
-    {
-      logger.warning("The " + name + " is missing.");
-    }
-
-    return false;
-  }
-
-  return true;
-}
-
-function sessionSourceCheck(source, log)
-{
-  for (var i in session.data)
-  {
-    if (source.localeCompare(session.data[i].editSession.getValue()) == 0)
-    {
-      return true;
-    }
-  }
-
-  if (log)
-  {
-    logger.warning("The source in the session is invalid!");
-  }
-
-  return false;
-}
-
-/*
 ████████  █████  ██████
    ██    ██   ██ ██   ██
    ██    ███████ ██████
@@ -598,7 +648,7 @@ function updateFilePanel(id, name, type)
 
   $("#tab-" + id).on("click", function()
   {
-    switchSession(id);
+    session.switchSession(id);
   });
 
   $("#tab-" + id + " i").on("click", function()
@@ -627,21 +677,21 @@ function closeTab(id)
 
   // If the selected session is the current session
   // let's switch to an other existing session.
-  if (id == session.activeID)
+  if (id == session.getActiveID())
   {
-    var nID = getSessionNeighbourById(id);
+    var nID = session.getSessionNeighbourById(id);
     if (nID != 0)
     {
-      switchSession(nID);
+      session.switchSession(nID);
     }
     else
     {
-      setWelcomeSession();
+      session.setWelcomeSession();
     }
   }
 
   // Delete the selected sesison.
-  deleteSessionByAttr("id", id);
+  session.deleteSessionByAttr("id", id);
 }
 
 /*
@@ -667,7 +717,7 @@ $(document).ready(function()
   // This is gonna be fixed in the next version of ace.
   env.editor.$blockScrolling = Infinity;
 
-  setWelcomeSession();
+  session.setWelcomeSession();
 
   /*
   * Editor settings toggle button event.
@@ -716,18 +766,9 @@ $(document).ready(function()
         continue;
       }
 
-      var stored = false;
-      for (var j = 0; j < session.data.length; j++)
+      if (session.sessionNameCheck(files[i].name))
       {
-        if (files[i].name.endsWith(session.data[j].name))
-        {
-          stored = true;
-          break;
-        }
-      }
-      if (stored)
-      {
-        logger.error(session.data[j].name + " is already loaded.");
+        logger.error(files[i].name + " is already loaded.");
         valid--;
         continue;
       }
@@ -738,7 +779,7 @@ $(document).ready(function()
 
         reader.onload = function(evt)
         {
-          createNewSession(file.name, evt.target.result, filetab.work, true);
+          session.createNewSession(file.name, evt.target.result, filetab.work, true);
         }
 
         reader.onerror = function(evt)
@@ -776,7 +817,7 @@ $(document).ready(function()
       info.append("<p>The filename must be at least 3 characters long and must ends with '.js'.</p>");
       valid = false;
     }
-    if (getSessionIdbyName(fileName) != null)
+    if (session.getSessionIdbyName(fileName) != null)
     {
       info.append("<p>This filename is already taken.</p>");
       valid = false;
@@ -784,7 +825,7 @@ $(document).ready(function()
 
     if (valid)
     {
-      createNewSession(fileName, "", filetab.work, false);
+      session.createNewSession(fileName, "", filetab.work, false);
 
       $("#new-file-name").val("");
       $("#new-file-modal").modal("hide");
@@ -796,15 +837,15 @@ $(document).ready(function()
   */
   $("#save-file-button").on("click", function()
   {
-    if (session.activeID == 0)
+    if (session.getActiveID() == 0)
     {
       logger.error("You can not save the welcome.js file.");
     }
     else
     {
       var blob = new Blob([env.editor.session.getValue()], {type: "text/javascript;charset=utf-8"});
-      saveAs(blob, getSessionNameById(session.activeID));
-      $("#tab-" + session.activeID).removeClass("unsaved");
+      saveAs(blob, session.getSessionNameById(session.getActiveID()));
+      $("#tab-" + session.getActiveID()).removeClass("unsaved");
     }
   });
 
@@ -992,7 +1033,7 @@ $(document).ready(function()
   */
   env.editor.on("change", function(e)
   {
-    $("#tab-" + session.activeID).addClass("unsaved");
+    $("#tab-" + session.getActiveID()).addClass("unsaved");
     if (client.debuggerObj)
     {
       updateInvalidLines();
@@ -1100,7 +1141,7 @@ $(document).ready(function()
         if(typeof breakpoints[row] === typeof undefined) {
           env.editor.session.setBreakpoint(row);
           env.breakpointIds[row] = client.debuggerObj.getNextBreakpointIndex();
-          client.debuggerObj.setBreakpoint(getSessionNameById(session.activeID) + ":" + parseInt(row + 1));
+          client.debuggerObj.setBreakpoint(session.getSessionNameById(session.getActiveID()) + ":" + parseInt(row + 1));
         }
         else
         {
@@ -1932,10 +1973,8 @@ function DebuggerClient(address)
 
         if (breakpoint.func.sourceName != '')
         {
-          if (!sessionNameCheck(breakpoint.func.sourceName, true))
+          if (!session.sessionNameCheck(breakpoint.func.sourceName, true))
           {
-            //sessionSourceCheck(breakpoint.func.source.trim(), true);
-          //} else {
             logger.debug('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>', true);
             $(".load-from-jerry").on("click", function()
             {
@@ -1943,7 +1982,7 @@ function DebuggerClient(address)
               var code = breakpoint.func.source;
               var name = breakpoint.func.sourceName.split("/");
               name = name[name.length - 1];
-              createNewSession(name, code, filetab.work, true);
+              session.createNewSession(name, code, filetab.work, true);
               $(this).addClass("disabled");
               $(this).unbind("click");
             });
@@ -1951,18 +1990,18 @@ function DebuggerClient(address)
         }
 
         // Go the the right session.
-        var sID = getSessionIdbyName(breakpoint.func.sourceName);
-        if (sID != null && sID != session.activeID)
+        var sID = session.getSessionIdbyName(breakpoint.func.sourceName);
+        if (sID != null && sID != session.getActiveID())
         {
           // Remove the highlite from the current session.
           unhighlightLine();
 
           // Change the session.
-          switchSession(sID);
+          session.switchSession(sID);
 
         }
 
-        if (sID == session.activeID)
+        if (sID == session.getActiveID())
         {
           highlightCurrentLine(breakpoint.line);
           updateInvalidLines();
