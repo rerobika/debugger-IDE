@@ -15,14 +15,17 @@ const ServerPackageType = {
   JERRY_DEBUGGER_FUNCTION_NAME : 11,
   JERRY_DEBUGGER_FUNCTION_NAME_END : 12,
   JERRY_DEBUGGER_RELEASE_BYTE_CODE_CP : 13,
-  JERRY_DEBUGGER_BREAKPOINT_HIT : 14,
-  JERRY_DEBUGGER_EXCEPTION_HIT : 15,
-  JERRY_DEBUGGER_BACKTRACE : 16,
-  JERRY_DEBUGGER_BACKTRACE_END : 17,
-  JERRY_DEBUGGER_EVAL_RESULT : 18,
-  JERRY_DEBUGGER_EVAL_RESULT_END : 19,
-  JERRY_DEBUGGER_EVAL_ERROR : 20,
-  JERRY_DEBUGGER_EVAL_ERROR_END : 21
+  JERRY_DEBUGGER_MEMSTATS_RECEIVE : 14,
+  JERRY_DEBUGGER_BREAKPOINT_HIT : 15,
+  JERRY_DEBUGGER_EXCEPTION_HIT : 16,
+  JERRY_DEBUGGER_EXCEPTION_STR : 17,
+  JERRY_DEBUGGER_EXCEPTION_STR_END : 18,
+  JERRY_DEBUGGER_BACKTRACE : 19,
+  JERRY_DEBUGGER_BACKTRACE_END : 20,
+  JERRY_DEBUGGER_EVAL_RESULT : 21,
+  JERRY_DEBUGGER_EVAL_RESULT_END : 22,
+  JERRY_DEBUGGER_EVAL_ERROR : 23,
+  JERRY_DEBUGGER_EVAL_ERROR_END : 24
 };
 
 /**
@@ -32,13 +35,14 @@ const ClientPackageType = {
   JERRY_DEBUGGER_FREE_BYTE_CODE_CP : 1,
   JERRY_DEBUGGER_UPDATE_BREAKPOINT : 2,
   JERRY_DEBUGGER_EXCEPTION_CONFIG : 3,
-  JERRY_DEBUGGER_STOP : 4,
-  JERRY_DEBUGGER_CONTINUE : 5,
-  JERRY_DEBUGGER_STEP : 6,
-  JERRY_DEBUGGER_NEXT : 7,
-  JERRY_DEBUGGER_GET_BACKTRACE : 8,
-  JERRY_DEBUGGER_EVAL : 9,
-  JERRY_DEBUGGER_EVAL_PART : 10
+  JERRY_DEBUGGER_MEMSTATS : 4,
+  JERRY_DEBUGGER_STOP : 5,
+  JERRY_DEBUGGER_CONTINUE : 6,
+  JERRY_DEBUGGER_STEP : 7,
+  JERRY_DEBUGGER_NEXT : 8,
+  JERRY_DEBUGGER_GET_BACKTRACE : 9,
+  JERRY_DEBUGGER_EVAL : 10,
+  JERRY_DEBUGGER_EVAL_PART : 11
 };
 
 /**
@@ -1285,6 +1289,7 @@ function DebuggerClient(address)
   var pendingBreakpoints = [ ];
   var backtraceFrame = 0;
   var evalResult = null;
+  var exceptionData = null;
 
   function assert(expr)
   {
@@ -1990,6 +1995,18 @@ function DebuggerClient(address)
         return;
       }
 
+      case ServerPackageType.JERRY_DEBUGGER_MEMSTATS_RECEIVE:
+      {
+        var messagedata = decodeMessage("IIIII", message, 1);
+
+        logger.info("Allocated bytes: " + messagedata[0]);
+        logger.info("Byte code bytes: " + messagedata[1]);
+        logger.info("String bytes: " + messagedata[2]);
+        logger.info("Object bytes: " + messagedata[3]);
+        logger.info("Property bytes: " + messagedata[4]);
+        return;
+      }
+
       case ServerPackageType.JERRY_DEBUGGER_BREAKPOINT_HIT:
       case ServerPackageType.JERRY_DEBUGGER_EXCEPTION_HIT:
       {
@@ -1999,7 +2016,12 @@ function DebuggerClient(address)
 
         if (message[0] == ServerPackageType.JERRY_DEBUGGER_EXCEPTION_HIT)
         {
-          logger.info("Exception throw detected");
+          logger.info("Exception throw detected (to disable automatic stop type exception 0)");
+          if (exceptionData)
+          {
+            logger.info("Exception hint: " + cesu8ToString(exceptionData));
+            exceptionData = null;
+          }
         }
 
         lastBreakpointHit = breakpoint;
@@ -2063,6 +2085,13 @@ function DebuggerClient(address)
         }
         /* EXTENDED CODE */
 
+        return;
+      }
+
+      case ServerPackageType.JERRY_DEBUGGER_EXCEPTION_STR:
+      case ServerPackageType.JERRY_DEBUGGER_EXCEPTION_STR_END:
+      {
+        exceptionData = concatUint8Arrays(exceptionData, message);
         return;
       }
 
@@ -2529,6 +2558,10 @@ function debuggerCommand(event)
     case "st":
     case "stop":
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
+      break;
+    case "ms":
+    case "memstats":
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
       break;
     case "c":
     case "continue":
