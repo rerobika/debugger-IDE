@@ -41,51 +41,34 @@ const ClientPackageType = {
   JERRY_DEBUGGER_EVAL_PART : 10
 };
 
+/**
+* Client connection.
+*/
 var client = {
   socket : null,
   debuggerObj : null,
 };
 
+/**
+* Core enviroment variables.
+*/
 var env = {
   editor : ace.edit("editor"),
   EditSession : null,
   evalResult : null,
-  breakpointIds : [],
-  lastBreakpoint : null,
-  isBacktracePanelActive : true,
-  isContActive : true,
-  commandInput : $("#command-line-input"),
-  clBacktrace : false,
+  commandInput : $("#command-line-input")
 };
 
-var layout = {
-  numberOfHiddenPanel : 0,
-  lastKnownTargetCol : 6,
-  lastKnownNextCol : 6
-};
-
-var button = {
-  continue : 0,
-  stop : 1,
-};
-
-var filetab = {
-  isWelcome : true,
-  welcome : 0,
-  work : 1,
-};
-
-var marker = {
-  executed : null,
-  lastMarked : null,
-};
-
+/**
+* Costum keybindings.
+*/
 var keybindings = {
   ace : null,
   vim : "ace/keyboard/vim",
   emacs : "ace/keyboard/emacs",
   custom : null, // Create own bindings here.
 };
+
 
 /**
 * Basic utilities.
@@ -176,14 +159,30 @@ Logger.prototype.debug = function(data, button = false) {
 };
 
 
-
 /**
 * Session handler for the editor files.
 */
-function Session() {
+function Session(editor) {
   this.nextID = 0;
   this.activeID = 0;
   this.data = [];
+
+  this.breakpointIDs = [];
+  this.lastBreakpoint = null;
+
+  this.marker = {
+    executed : null,
+    lastMarked : null,
+  };
+
+  this.isWelcomeTabActive = true;
+  this.tabType = {
+    welcome : 0,
+    work : 1,
+  };
+
+  this.editor = editor;
+  this.util = new Util();
 
   return this;
 }
@@ -204,6 +203,33 @@ Session.prototype.getNextID = function() {
 */
 Session.prototype.getActiveID = function() {
   return this.activeID;
+};
+
+/**
+* Returns the inserted breakpoint IDs.
+*
+* @return {array}
+*/
+Session.prototype.getBreakpointIDs = function() {
+  return this.breakpointIDs;
+};
+
+/**
+* Returns the last catched breakpoint's ID.
+*
+* @return {integer}
+*/
+Session.prototype.getLastBreakpoint = function() {
+  return this.lastBreakpoint;
+};
+
+/**
+* Sets the lastBreakpoint to the given value.
+*
+* @param {integer} last
+*/
+Session.prototype.setLastBreakpoint = function(last) {
+  this.lastBreakpoint = last;
 };
 
 /**
@@ -230,12 +256,12 @@ Session.prototype.createNewSession = function(name, data, tab, saved) {
     editSession : eSession
   });
 
-  updateFilePanel(this.nextID, name, tab);
+  session.updateTabs(this.nextID, name, tab);
   this.switchSession(this.nextID);
 };
 
 Session.prototype.setWelcomeSession = function() {
-  filetab.isWelcome = true;
+  this.isWelcomeTabActive = true;
 
   // If this is a fresh start.
   if (this.getSessionById(0) == null)
@@ -253,11 +279,11 @@ Session.prototype.setWelcomeSession = function() {
     });
   }
 
-  updateFilePanel(0, "welcome.js", filetab.welcome);
+  session.updateTabs(0, "welcome.js", session.tabType.welcome);
   this.switchSession(0);
 
   // Enable the read only mode in the editor.
-  env.editor.setReadOnly(true);
+  this.editor.setReadOnly(true);
 }
 
 /**
@@ -267,9 +293,9 @@ Session.prototype.setWelcomeSession = function() {
 */
 Session.prototype.switchSession = function(id) {
   // Select the right tab on the tabs panel.
-  selectTab(id);
+  this.selectTab(id);
 
-  // Marked the selected session as an active sesison.
+  // Marked the selected session as an active session.
   this.activeID = id;
   // Change the currently session through the editor's API.
   env.editor.setSession(this.getSessionById(id));
@@ -280,7 +306,7 @@ Session.prototype.switchSession = function(id) {
       env.lastBreakpoint != null &&
       env.lastBreakpoint.func.sourceName.endsWith(session.getSessionNameById(id)))
   {
-    highlightCurrentLine(env.lastBreakpoint.line);
+    this.highlightCurrentLine(env.lastBreakpoint.line);
   }
 
   // Disable the read only in the editor.
@@ -292,7 +318,7 @@ Session.prototype.switchSession = function(id) {
   // If the there is no connecton then delete the inserted breakpoints.
   if (!client.debuggerObj)
   {
-    deleteBreakpointsFromEditor();
+    this.deleteBreakpointsFromEditor();
   }
 }
 
@@ -401,90 +427,51 @@ Session.prototype.getSessionNeighbourById = function(id) {
 * Searches the given name in the stored sessions.
 *
 * @param {string} name The searched session name.
-* @param {boolean} log Disable on enable the result log.
 * @return {boolean} Returns true if the given name is exists, false otherwise.
 */
-Session.prototype.sessionNameCheck = function(name, log) {
+Session.prototype.sessionNameCheck = function(name) {
   var log = log || false;
   if (this.getSessionIdbyName(name) === null)
   {
-    if (log)
-    {
-      logger.warning("The " + name + " is missing.");
-    }
-
     return false;
   }
 
   return true;
 }
 
-const logger = new Logger($("#console-panel"));
-const evalLogger = new Logger($("#eval-panel"));
-const util = new Util();
-const session = new Session();
-
-/*
-██████  ██    ██ ████████ ████████  ██████  ███    ██ ███████
-██   ██ ██    ██    ██       ██    ██    ██ ████   ██ ██
-██████  ██    ██    ██       ██    ██    ██ ██ ██  ██ ███████
-██   ██ ██    ██    ██       ██    ██    ██ ██  ██ ██      ██
-██████   ██████     ██       ██     ██████  ██   ████ ███████
+/**
+* Marks every valid, available breakpoint line in the current session file.
 */
-
-function disableButtons(disable)
-{
-  if (disable)
+Session.prototype.markBreakpointLines = function() {
+  if (client.debuggerObj)
   {
-    // Enable the connection button.
-    $("#connect-to-button").removeClass("disabled");
-    $("#host-address").removeAttr("disabled");
+    var lines = this.getLinesFromRawData(client.debuggerObj.getBreakpointLines());
 
-    // Disable the debugger buttons.
-    $(".debugger-buttons .btn-default").addClass("disabled");
-  }
-  else
-  {
-    // Disable the connection button.
-    $("#connect-to-button").addClass("disabled");
-    $("#host-address").attr("disabled", true);
+    if (lines.length != 0)
+    {
+      lines.sort(function(a, b){ return a - b} );
 
-    // Enable the debugger buttons.
-    $(".debugger-buttons .btn-default").removeClass("disabled");
+      for (var i = this.editor.session.getLength(); i > 0; i--) {
+        if (lines.includes(i) === false)
+        {
+          this.editor.session.removeGutterDecoration(i - 1, "invalid-gutter-cell");
+          this.editor.session.addGutterDecoration(i - 1, "invalid-gutter-cell");
+        }
+      }
+    }
   }
 }
 
-function updateContinueStopButton(value)
-{
-  switch (value)
-  {
-    case button.stop:
-    {
-      env.isContActive = false;
-      $("#continue-stop-button i").removeClass("fa-play");
-      $("#continue-stop-button i").addClass("fa-stop");
-    } break;
-    case button.continue:
-    {
-      $("#continue-stop-button i").removeClass("fa-stop");
-      $("#continue-stop-button i").addClass("fa-play");
-      env.isContActive = true;
-    } break;
-  }
-}
-
-/*
-██████  ██████        ██████   █████  ████████  █████
-██   ██ ██   ██       ██   ██ ██   ██    ██    ██   ██
-██████  ██████  █████ ██   ██ ███████    ██    ███████
-██   ██ ██            ██   ██ ██   ██    ██    ██   ██
-██████  ██            ██████  ██   ██    ██    ██   ██
+/**
+* Returns every valid, available line in the currently active session.
+*
+* @param {object} raw
+* @return {array} The array of the file lines.
 */
-
-function getLinesFromRawData(raw)
+Session.prototype.getLinesFromRawData = function(raw)
 {
   var lines = [];
-  var sessionName = session.getSessionNameById(session.getActiveID());
+  var sessionName = this.getSessionNameById(this.activeID);
 
   for (var i in raw)
   {
@@ -497,82 +484,206 @@ function getLinesFromRawData(raw)
   return lines;
 }
 
-function updateInvalidLines()
-{
-  if (client.debuggerObj)
-  {
-    var lines = getLinesFromRawData(client.debuggerObj.getBreakpointLines());
+/**
+* Highlights the current progress line in the editor session with a border.
+*
+* @param {integer} lineNumber The selected line.
+*/
+Session.prototype.highlightCurrentLine = function(lineNumber) {
+  lineNumber--;
+  this.unhighlightLine();
+  var Range = ace.require("ace/range").Range;
+  this.marker.executed = this.editor.session.addMarker(new Range(lineNumber, 0, lineNumber, 1), "execute-marker", "fullLine");
 
-    if (lines.length != 0)
-    {
-      lines.sort(function(a, b){ return a - b} );
-
-      for (var i = env.editor.session.getLength(); i > 0; i--) {
-        if (lines.includes(i) === false)
-        {
-          env.editor.session.removeGutterDecoration(i - 1, "invalid-gutter-cell");
-          env.editor.session.addGutterDecoration(i - 1, "invalid-gutter-cell");
-        }
-      }
-    }
-  }
+  this.editor.session.addGutterDecoration(lineNumber, "execute-gutter-cell-marker");
+  this.marker.lastMarked = lineNumber;
 }
 
-function deleteBreakpointsFromEditor()
-{
-  for (var i in env.breakpointIds)
-  {
-    env.editor.session.clearBreakpoint(i);
-  }
-
-  util.clearElement($("#breakpoints-content"));
+/**
+* Removes the highlight (border) from the last highlighted line.
+*/
+Session.prototype.unhighlightLine = function() {
+  this.editor.getSession().removeMarker(this.marker.executed);
+  this.editor.session.removeGutterDecoration(this.marker.lastMarked, "execute-gutter-cell-marker");
 }
 
-function getbacktrace()
-{
-  var max_depth = 0;
-  var user_depth = $("#backtrace-depth").val();
+/**
+* Deletes the breakpoints from the session and from the editor.
+*/
+Session.prototype.deleteBreakpointsFromEditor = function() {
+  for (var i in this.breakpointIDs) {
+    this.editor.session.clearBreakpoint(i);
+  }
 
-  if (user_depth != 0)
+  this.util.clearElement($("#breakpoints-content"));
+}
+
+/**
+* Appends the given tab into the session tabs panel.
+*
+* @param {integer} id
+* @param {string} name
+* @param {integer} type
+*/
+Session.prototype.updateTabs = function(id, name, type) {
+  if (this.isWelcomeTabActive && type === this.tabType.work)
   {
-    if (/[1-9][0-9]*/.exec(user_depth))
+    $(".session-tabs").empty();
+    this.isWelcomeTabActive = false;
+  }
+
+  var tab = "";
+
+  tab += "<a href='javascript:void(0)' class='tablinks' id='tab-" + id + "'> " + name;
+  if (type == this.tabType.work)
+  {
+    tab += "<i class='fa fa-times' aria-hidden='true'></i>";
+  }
+  tab += "</a>";
+
+  $(".session-tabs").append(tab);
+
+  $("#tab-" + id).on("click", $.proxy(function()
+  {
+    this.switchSession(id);
+  }, this));
+
+  $("#tab-" + id + " i").on("click", $.proxy(function()
+  {
+    this.closeTab(id);
+  }, this));
+}
+
+/**
+* Sets the selected tab to active state in the tab panel.
+*
+* @param {integer} id
+*/
+Session.prototype.selectTab = function(id)
+{
+  // Get all elements with class="tablinks" and remove the class "active"
+  var tablinks = $(".tablinks");
+  for (var i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+
+  // Set the current tab active.
+  $("#tab-" + id)[0].className += " active";
+}
+
+/**
+* Closes the selected tab and deletes that from the sessions.
+*
+* @param {integer} id
+*/
+Session.prototype.closeTab = function(id)
+{
+  // Remove the sesison tab from the session bar.
+  $("#tab-" + id).remove();
+
+  // If the selected session is the current session
+  // let's switch to an other existing session.
+  if (id == this.getActiveID())
+  {
+    var nID = this.getSessionNeighbourById(id);
+    if (nID != 0)
     {
-      max_depth = parseInt(user_depth);
+      this.switchSession(nID);
     }
     else
     {
-      logger.error("Invalid maximum depth parameter.");
-      return true;
+      this.setWelcomeSession();
     }
   }
 
-  client.debuggerObj.encodeMessage("BI", [ ClientPackageType.JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
+  // Delete the selected sesison.
+  this.deleteSessionByAttr("id", id);
 }
 
-function highlightCurrentLine(lineNumber) {
-  lineNumber--;
-  unhighlightLine();
-  var Range = ace.require("ace/range").Range;
-  marker.executed = env.editor.session.addMarker(new Range(lineNumber, 0, lineNumber, 1), "execute-marker", "fullLine");
-
-  env.editor.session.addGutterDecoration(lineNumber, "execute-gutter-cell-marker");
-  marker.lastMarked = lineNumber;
-}
-
-function unhighlightLine(){
-  env.editor.getSession().removeMarker(marker.executed);
-  env.editor.session.removeGutterDecoration(marker.lastMarked, "execute-gutter-cell-marker");
-}
-
-/*
-██████   █████  ███    ██ ███████ ██      ███████
-██   ██ ██   ██ ████   ██ ██      ██      ██
-██████  ███████ ██ ██  ██ █████   ██      ███████
-██      ██   ██ ██  ██ ██ ██      ██           ██
-██      ██   ██ ██   ████ ███████ ███████ ███████
+/**
+* Functions for improve the user experience :).
 */
+function Surface() {
+  this.CSState = {
+    stop : 0,
+    continue : 1
+  };
 
-function updateBacktracePanel(frame, info)
+  this.continueActive = true;
+
+  this.numberOfHiddenPanel = 0;
+  this.lastKnownTargetCol = 6;
+  this.lastKnownNextCol = 6;
+
+  this.isBacktracePanelActive = true;
+
+  this.util = new Util();
+}
+
+/**
+* Returns the continueActive state.
+*
+* @return {boolean}
+*/
+Surface.prototype.isContinueActive = function() {
+  return this.continueActive;
+};
+
+/**
+* Disables or enables the available action buttons based on the given parameter.
+*
+* @param {boolean} disable
+*/
+Surface.prototype.disableActionButtons = function(disable) {
+  if (disable) {
+    // Enable the connection button.
+    $("#connect-to-button").removeClass("disabled");
+    $("#host-address").removeAttr("disabled");
+
+    // Disable the debugger action buttons.
+    $(".debugger-buttons .btn-default").addClass("disabled");
+  }
+  else
+  {
+    // Disable the connection button.
+    $("#connect-to-button").addClass("disabled");
+    $("#host-address").attr("disabled", true);
+
+    // Enable the debugger action buttons.
+    $(".debugger-buttons .btn-default").removeClass("disabled");
+  }
+};
+
+/**
+* Sets to the proper state the Continue/Stop action button.
+*
+* @param {integer} state
+*/
+Surface.prototype.continueStopButtonState = function(state) {
+  switch (state)
+  {
+    case this.CSState.stop:
+    {
+      this.continueActive = false;
+      $("#continue-stop-button i").removeClass("fa-play");
+      $("#continue-stop-button i").addClass("fa-stop");
+    } break;
+    case this.CSState.continue:
+    {
+      $("#continue-stop-button i").removeClass("fa-stop");
+      $("#continue-stop-button i").addClass("fa-play");
+      this.continueActive = true;
+    } break;
+  }
+};
+
+/**
+* Updates the backtrace panel with a new entry.
+*
+* @param {integer} frame
+* @param {object} info
+*/
+Surface.prototype.updateBacktracePanel = function(frame, info)
 {
   var sourceName = info.func.sourceName || info;
   var line = info.line || "-";
@@ -587,13 +698,16 @@ function updateBacktracePanel(frame, info)
       "<div class='list-col list-col-3'>" + func + "</div>" +
     "</div>"
   );
-  util.scrollDown(panel);
+  this.util.scrollDown(panel);
 }
 
-function updateBreakpointsPanel()
+/**
+* Updates the breakpoint panel based on the active breakpoints.
+*/
+Surface.prototype.updateBreakpointsPanel = function()
 {
   var panel = $("#breakpoints-content");
-  util.clearElement(panel);
+  this.util.clearElement(panel);
 
   var activeBreakpoints = client.debuggerObj.getActiveBreakpoints();
 
@@ -614,93 +728,33 @@ function updateBreakpointsPanel()
     );
   }
 
-  util.scrollDown(panel);
+  this.util.scrollDown(panel);
 }
 
-/*
-████████  █████  ██████
-   ██    ██   ██ ██   ██
-   ██    ███████ ██████
-   ██    ██   ██ ██   ██
-   ██    ██   ██ ██████
-*/
-
-function updateFilePanel(id, name, type)
+Surface.prototype.getbacktrace = function()
 {
-  if (filetab.isWelcome && type === filetab.work)
+  var max_depth = 0;
+  var user_depth = $("#backtrace-depth").val();
+
+  if (user_depth != 0)
   {
-    $(".file-tabs").empty();
-    filetab.isWelcome = false;
-  }
-
-  var tab = "";
-
-  tab += "<a href='javascript:void(0)' class='tablinks' id='tab-" + id + "'> " + name;
-  if (type == filetab.work)
-  {
-    tab += "<i class='fa fa-times' aria-hidden='true'></i>";
-  }
-  tab += "</a>";
-
-  $(".file-tabs").append(tab);
-
-  //selectTab(id);
-
-  $("#tab-" + id).on("click", function()
-  {
-    session.switchSession(id);
-  });
-
-  $("#tab-" + id + " i").on("click", function()
-  {
-    closeTab(id);
-  });
-}
-
-function selectTab(id)
-{
-  // Get all elements with class="tablinks" and remove the class "active"
-  var tablinks = $(".tablinks");
-  for (var i = 0; i < tablinks.length; i++) {
-    tablinks[i].className = tablinks[i].className.replace(" active", "");
-  }
-
-  // Set the current tab active.
-  $("#tab-" + id)[0].className += " active";
-}
-
-
-function closeTab(id)
-{
-  // Remove the sesison tab from the session bar.
-  $("#tab-" + id).remove();
-
-  // If the selected session is the current session
-  // let's switch to an other existing session.
-  if (id == session.getActiveID())
-  {
-    var nID = session.getSessionNeighbourById(id);
-    if (nID != 0)
+    if (/[1-9][0-9]*/.exec(user_depth))
     {
-      session.switchSession(nID);
+      max_depth = parseInt(user_depth);
     }
     else
     {
-      session.setWelcomeSession();
+      return true;
     }
   }
 
-  // Delete the selected sesison.
-  session.deleteSessionByAttr("id", id);
+  client.debuggerObj.encodeMessage("BI", [ ClientPackageType.JERRY_DEBUGGER_GET_BACKTRACE, max_depth ]);
 }
 
-/*
-██████  ███████  █████  ██████  ██    ██
-██   ██ ██      ██   ██ ██   ██  ██  ██
-██████  █████   ███████ ██   ██   ████
-██   ██ ██      ██   ██ ██   ██    ██
-██   ██ ███████ ██   ██ ██████     ██
-*/
+const logger = new Logger($("#console-panel"));
+const util = new Util();
+const session = new Session(env.editor);
+const surface = new Surface();
 
 $(document).ready(function()
 {
@@ -957,24 +1011,24 @@ $(document).ready(function()
     {
       if (panel === "backtrace")
       {
-        env.isBacktracePanelActive = true;
+        surface.isBacktracePanelActive = true;
       }
       $("#" + panel + "-wrapper").show();
-      layout.numberOfHiddenPanel--;
+      surface.numberOfHiddenPanel--;
     }
     else
     {
       if (panel === "backtrace")
       {
-        env.isBacktracePanelActive = false;
+        surface.isBacktracePanelActive = false;
       }
       $("#" + panel + "-wrapper").hide();
-      layout.numberOfHiddenPanel++;
+      surface.numberOfHiddenPanel++;
     }
 
     // If every information panels are hidden then expand the editor.
     // -1 from the length because of the resizable div element.
-    if (layout.numberOfHiddenPanel == $("#info-panels").children().length - 1)
+    if (surface.numberOfHiddenPanel == $("#info-panels").children().length - 1)
     {
       $("#editor-wrapper").removeClass();
       $("#editor-wrapper").addClass("col-md-12");
@@ -982,11 +1036,11 @@ $(document).ready(function()
       env.editor.resize()
 
     // If there is at least one information panel then reset the last known layout.
-  } else if (layout.numberOfHiddenPanel > 0 && !$("#info-panels").is(":visible")) {
+  } else if (surface.numberOfHiddenPanel > 0 && !$("#info-panels").is(":visible")) {
       $("#editor-wrapper").removeClass();
-      $("#editor-wrapper").addClass("col-md-" + layout.lastKnownNextCol + " resizable");
+      $("#editor-wrapper").addClass("col-md-" + surface.lastKnownNextCol + " resizable");
       $("#info-panels").removeClass();
-      $("#info-panels").addClass("col-md-" + layout.lastKnownTargetCol + " resizable");
+      $("#info-panels").addClass("col-md-" + surface.lastKnownTargetCol + " resizable");
       $("#info-panels").show();
       env.editor.resize()
     }
@@ -1036,7 +1090,7 @@ $(document).ready(function()
     $("#tab-" + session.getActiveID()).addClass("unsaved");
     if (client.debuggerObj)
     {
-      updateInvalidLines();
+      session.markBreakpointLines();
     }
   });
 
@@ -1044,7 +1098,7 @@ $(document).ready(function()
   {
     if (client.debuggerObj)
     {
-      updateInvalidLines();
+      session.markBreakpointLines();
     }
   });
 
@@ -1066,7 +1120,7 @@ $(document).ready(function()
       {
         logger.info("No active breakpoints.")
       }
-      deleteBreakpointsFromEditor();
+      session.deleteBreakpointsFromEditor();
     }
   });
 
@@ -1077,14 +1131,14 @@ $(document).ready(function()
       return true;
     }
 
-    if (env.isContActive)
+    if (surface.isContinueActive())
     {
-      updateContinueStopButton(button.stop);
+      surface.continueStopButtonState(surface.CSState.stop);
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_CONTINUE ]);
     }
     else
     {
-      updateContinueStopButton(button.continue);
+      surface.continueStopButtonState(surface.CSState.continue);
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
     }
   });
@@ -1134,21 +1188,21 @@ $(document).ready(function()
 
       var breakpoints = e.editor.session.getBreakpoints(row, 0);
       var row = e.getDocumentPosition().row;
-      var lines = getLinesFromRawData(client.debuggerObj.getBreakpointLines());
+      var lines = session.getLinesFromRawData(client.debuggerObj.getBreakpointLines());
 
       if (lines.includes(row + 1))
       {
         if(typeof breakpoints[row] === typeof undefined) {
           env.editor.session.setBreakpoint(row);
-          env.breakpointIds[row] = client.debuggerObj.getNextBreakpointIndex();
+          session.getBreakpointIDs[row] = client.debuggerObj.getNextBreakpointIndex();
           client.debuggerObj.setBreakpoint(session.getSessionNameById(session.getActiveID()) + ":" + parseInt(row + 1));
         }
         else
         {
-          client.debuggerObj.deleteBreakpoint(env.breakpointIds[row]);
+          client.debuggerObj.deleteBreakpoint(session.getBreakpointIDs[row]);
           env.editor.session.clearBreakpoint(row);
 
-          updateBreakpointsPanel();
+          surface.updateBreakpointsPanel();
         }
       }
 
@@ -1203,8 +1257,8 @@ $(function() {
       if (nextSet < 4) nextSet = 4;
       if (nextSet > 8) nextSet = 8;
       // Store the calculated column numbers.
-      layout.lastKnownTargetCol = targetSet;
-      layout.lastKnownNextCol = nextSet;
+      surface.lastKnownTargetCol = targetSet;
+      surface.lastKnownNextCol = nextSet;
       // Refresh the columns.
       updateClass(target, targetSet);
       updateClass(next, nextSet);
@@ -1212,14 +1266,9 @@ $(function() {
   });
 });
 
-/*
- ██████ ██      ██ ███████ ███    ██ ████████
-██      ██      ██ ██      ████   ██    ██
-██      ██      ██ █████   ██ ██  ██    ██
-██      ██      ██ ██      ██  ██ ██    ██
- ██████ ███████ ██ ███████ ██   ████    ██
+/**
+* JerryScript debugger client.
 */
-
 function DebuggerClient(address)
 {
   logger.info("ws://" + address + "/jerry-debugger");
@@ -1479,9 +1528,9 @@ function DebuggerClient(address)
       logger.info("Connection closed.");
       // "Reset the editor".
       util.clearElement($("#backtrace-content"));
-      deleteBreakpointsFromEditor();
-      unhighlightLine();
-      disableButtons(true);
+      session.deleteBreakpointsFromEditor();
+      session.unhighlightLine();
+      surface.disableActionButtons(true);
     }
   }
   client.socket.onclose = client.socket.onerror;
@@ -1489,7 +1538,7 @@ function DebuggerClient(address)
   client.socket.onopen = function(event)
   {
     logger.info("Connection created.");
-    disableButtons(false);
+    surface.disableActionButtons(false);
   }
 
   function getFormatSize(format)
@@ -1967,9 +2016,9 @@ function DebuggerClient(address)
                    + breakpointToString(breakpoint));
 
         /* EXTENDED CODE */
-        env.lastBreakpoint = breakpoint;
+        session.setLastBreakpoint(breakpoint);
 
-        updateContinueStopButton(button.continue);
+        surface.continueStopButtonState(surface.CSState.continue);
 
         if (breakpoint.func.sourceName != '')
         {
@@ -1978,11 +2027,11 @@ function DebuggerClient(address)
             logger.debug('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>', true);
             $(".load-from-jerry").on("click", function()
             {
-              unhighlightLine();
+              session.unhighlightLine();
               var code = breakpoint.func.source;
               var name = breakpoint.func.sourceName.split("/");
               name = name[name.length - 1];
-              session.createNewSession(name, code, filetab.work, true);
+              session.createNewSession(name, code, session.tabType.work, true);
               $(this).addClass("disabled");
               $(this).unbind("click");
             });
@@ -1994,7 +2043,7 @@ function DebuggerClient(address)
         if (sID != null && sID != session.getActiveID())
         {
           // Remove the highlite from the current session.
-          unhighlightLine();
+          session.unhighlightLine();
 
           // Change the session.
           session.switchSession(sID);
@@ -2003,14 +2052,14 @@ function DebuggerClient(address)
 
         if (sID == session.getActiveID())
         {
-          highlightCurrentLine(breakpoint.line);
-          updateInvalidLines();
+          session.highlightCurrentLine(breakpoint.line);
+          session.markBreakpointLines();
         }
 
         // Show the backtrace on the panel.
-        if (env.isBacktracePanelActive)
+        if (surface.isBacktracePanelActive)
         {
-          getbacktrace();
+          surface.getbacktrace();
         }
         /* EXTENDED CODE */
 
@@ -2027,7 +2076,7 @@ function DebuggerClient(address)
 
           breakpoint = getBreakpoint(breakpointData).breakpoint;
 
-          updateBacktracePanel(backtraceFrame, breakpoint);
+          surface.updateBacktracePanel(backtraceFrame, breakpoint);
 
           ++backtraceFrame;
         }
@@ -2088,7 +2137,7 @@ function DebuggerClient(address)
     }
 
     logger.info("Breakpoint " + breakpoint.activeIndex + " at " + breakpointToString(breakpoint));
-    updateBreakpointsPanel();
+    surface.updateBreakpointsPanel();
   }
 
   this.setBreakpoint = function(str, pending)

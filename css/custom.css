@@ -238,7 +238,7 @@ input[type="number"] {
 /**
 * File tabs
 */
-#editor-wrapper div.file-tabs {
+#editor-wrapper div.session-tabs {
   overflow: hidden;
   border-top: 1px solid #ccc;
   border-right: 1px solid #ccc;
@@ -250,7 +250,7 @@ input[type="number"] {
 }
 
 /* Style the links inside the tab */
-#editor-wrapper div.file-tabs a {
+#editor-wrapper div.session-tabs a {
   position: relative;
   float: left;
   display: inline-block;
@@ -261,17 +261,21 @@ input[type="number"] {
   transition: 0.3s;
 }
 
+#editor-wrapper div.session-tabs a.active {
+  background-color: #ddd;
+}
+
 /* Change background color of links on hover */
-#editor-wrapper div.file-tabs a:hover {
+#editor-wrapper div.session-tabs a:hover {
   background-color: #ddd;
 }
 
 /* Create an active/current tablink class */
-#editor-wrapper div.file-tabs a:focus {
+#editor-wrapper div.session-tabs a:focus {
   background-color: #ddd;
 }
 
-#editor-wrapper div.file-tabs a i {
+#editor-wrapper div.session-tabs a i {
   position: absolute;
   width: 15px;
   height: 15px;
@@ -280,13 +284,13 @@ input[type="number"] {
   z-index: 100;
 }
 
-#editor-wrapper div.file-tabs a i:hover {
+#editor-wrapper div.session-tabs a i:hover {
   -ms-transform: scale(1.5, 1.5); /* IE 9 */
   -webkit-transform: scale(1.5, 1.5); /* Safari */
   transform: scale(1.5, 1.5);
 }
 
-#editor-wrapper div.file-tabs a.unsaved {
+#editor-wrapper div.session-tabs a.unsaved {
   text-decoration: underline;
 }
 
