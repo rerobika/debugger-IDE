@@ -147,17 +147,20 @@ Logger.prototype.error = function(message) {
 
 /**
 * Appends the given data into the panel
-* as a debug information in JSON format, or puts a button into it.
+* as a debug information in JSON format,
+* or puts a new dom element into it if the dom parametere is true.
 *
+* @param {string} message
 * @param {mixed} data
-* @param {boolean} button
+* @param {boolean} dom
 */
-Logger.prototype.debug = function(data, button = false) {
-  if (button) {
+Logger.prototype.debug = function(message, data, dom = false) {
+  if (dom) {
+    this.panel.append(this.line.clone().addClass("log-debug-dom").text(message));
     this.panel.append($(data));
   } else {
-    data = "DEBUG LOG: " + JSON.stringify(data);
-    this.panel.append(this.line.clone().addClass("log-debug").text(data));
+    message = "DEBUG LOG: " + message + JSON.stringify(data);
+    this.panel.append(this.line.clone().addClass("log-debug").text(message));
   }
   this.util.scrollDown(this.panel);
 };
@@ -2047,16 +2050,22 @@ function DebuggerClient(address)
         {
           if (!session.sessionNameCheck(breakpoint.func.sourceName, true))
           {
-            logger.debug('<div class="btn btn-xs btn-warning load-from-jerry">Load from Jerry</div>', true);
-            $(".load-from-jerry").on("click", function()
+            var name = breakpoint.func.sourceName.split("/");
+            name = name[name.length - 1];
+            var groupID = name.split(".")[0] + name.length;
+            logger.debug(
+              "The " + breakpoint.func.sourceName + " file is missing: ",
+              '<div class="btn btn-xs btn-default load-from-jerry ' + groupID + '">Load from Jerry</div>',
+              true
+            );
+            $(".load-from-jerry").on("click", function(e)
             {
               session.unhighlightLine();
               var code = breakpoint.func.source;
-              var name = breakpoint.func.sourceName.split("/");
-              name = name[name.length - 1];
               session.createNewSession(name, code, session.tabType.work, true);
-              $(this).addClass("disabled");
-              $(this).unbind("click");
+              $("." + groupID).addClass("disabled");
+              $("." + groupID).unbind("click");
+              e.stopImmediatePropagation();
             });
           }
         }
