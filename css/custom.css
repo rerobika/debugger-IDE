@@ -414,6 +414,11 @@ input[type="number"] {
   color: #ff1a1a;
 }
 
-#info-panels .console #console-panel .log-debug {
-  color: #595959;
+#info-panels .console #console-panel .log-debug,
+#info-panels .console #console-panel .log-debug-dom {
+  color: #000;
+}
+
+#info-panels .console #console-panel .log-debug-dom {
+  float: left;
 }
