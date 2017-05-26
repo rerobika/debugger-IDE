@@ -496,6 +496,7 @@ Session.prototype.highlightCurrentLine = function(lineNumber) {
   this.marker.executed = this.editor.session.addMarker(new Range(lineNumber, 0, lineNumber, 1), "execute-marker", "fullLine");
 
   this.editor.session.addGutterDecoration(lineNumber, "execute-gutter-cell-marker");
+  this.editor.scrollToLine(lineNumber, true, true, function () {});
   this.marker.lastMarked = lineNumber;
 }
 
