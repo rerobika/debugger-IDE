@@ -73,7 +73,6 @@ var keybindings = {
   custom : null, // Create own bindings here.
 };
 
-
 /**
 * Basic utilities.
 */
@@ -254,6 +253,7 @@ Session.prototype.createNewSession = function(name, data, tab, saved) {
   var doc = new env.Document(data.trim());
   // Create a new javascript mode session from the document.
   var eSession = new env.EditSession(doc, "ace/mode/javascript");
+  var breakpointInformationToChart = "";
 
   // Store the edit session.
   this.data.push({
@@ -1021,6 +1021,10 @@ $(document).ready(function()
       {
         surface.isBacktracePanelActive = true;
       }
+      if (panel === "memoryUsage")
+      {
+        resetChart();
+      }
       $("#" + panel + "-wrapper").show();
       surface.numberOfHiddenPanel--;
     }
@@ -1029,6 +1033,10 @@ $(document).ready(function()
       if (panel === "backtrace")
       {
         surface.isBacktracePanelActive = false;
+      }
+      if (panel === "memoryUsage")
+      {
+        stopUpdateDataPoints();
       }
       $("#" + panel + "-wrapper").hide();
       surface.numberOfHiddenPanel++;
@@ -1270,6 +1278,11 @@ $(function() {
       // Refresh the columns.
       updateClass(target, targetSet);
       updateClass(next, nextSet);
+      if(scrollable === true)
+      {
+        initChart("redraw");
+      }
+      maxDatapointNumber = Math.floor(document.getElementById("chart").clientWidth / 65);
     },
   });
 });
@@ -1535,6 +1548,7 @@ function DebuggerClient(address)
       client.socket = null;
       client.debuggerObj = null;
       logger.info("Connection closed.");
+      stopUpdateDataPoints();
       // "Reset the editor".
       util.clearElement($("#backtrace-content"));
       session.deleteBreakpointsFromEditor();
@@ -1547,6 +1561,7 @@ function DebuggerClient(address)
   client.socket.onopen = function(event)
   {
     logger.info("Connection created.");
+    resetChart();
     surface.disableActionButtons(false);
   }
 
@@ -2003,11 +2018,21 @@ function DebuggerClient(address)
       {
         var messagedata = decodeMessage("IIIII", message, 1);
 
-        logger.info("Allocated bytes: " + messagedata[0]);
-        logger.info("Byte code bytes: " + messagedata[1]);
-        logger.info("String bytes: " + messagedata[2]);
-        logger.info("Object bytes: " + messagedata[3]);
-        logger.info("Property bytes: " + messagedata[4]);
+        if(breakpointInformationToChart)
+        {
+          var breakpointLine = breakpointInformationToChart.split(":");
+          addNewDataPoints(messagedata, "line: " + (breakpointLine[1].split(" "))[0]);
+          breakpointInformationToChart = "";
+        }
+        else
+        {
+          logger.info("Allocated bytes: " + messagedata[0]);
+          logger.info("Byte code bytes: " + messagedata[1]);
+          logger.info("String bytes: " + messagedata[2]);
+          logger.info("Object bytes: " + messagedata[3]);
+          logger.info("Property bytes: " + messagedata[4]);
+          startUpdateDataPoints(messagedata);
+        }
         return;
       }
 
@@ -2093,8 +2118,11 @@ function DebuggerClient(address)
         {
           surface.getbacktrace();
         }
-        /* EXTENDED CODE */
 
+        /*Add breakpoint information to chart*/
+        client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
+        breakpointInformationToChart = breakpointToString(breakpoint);
+        /* EXTENDED CODE */
         return;
       }
 

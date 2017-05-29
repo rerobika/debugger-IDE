@@ -20,6 +20,18 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="fonts/font-awesome/css/font-awesome.min.css">
 
+  <!-- Chart CSS -->
+  <link rel="stylesheet" type="text/css" href="css/Chart/c3.css">
+
+  <!-- Chart source -->
+  <script src="js/Chart/c3.min.js"></script>
+
+  <!-- Chart source -->
+  <script src="js/Chart/d3.v3.min.js"></script>
+
+  <!-- Memory_usage_chart source -->
+  <script src="js/Chart/memory_usage_chart.js"></script>
+
   <!-- Custom CSS -->
   <link href="css/custom.css" rel="stylesheet">
 
@@ -265,6 +277,10 @@
                   <input type="checkbox" id="breakpoints-PanelSwitch" class="panel-switch" checked>
                 </div>
                 <div class="control-item">
+                  <label for="memoryUsage-PanelSwitch">Memory usage panel</label>
+                  <input type="checkbox" id="memoryUsage-PanelSwitch" class="panel-switch" checked>
+                </div>
+                <div class="control-item">
                   <label for="console-PanelSwitch">Console panel</label>
                   <input type="checkbox" id="console-PanelSwitch" class="panel-switch" checked>
                 </div>
@@ -382,6 +398,21 @@
                     <div class="list-col list-col-3">Function</div>
                   </div>
                   <div id="breakpoints-content" class="default-panel-content"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Memory usage -->
+          <div class="row" id="memoryUsage-wrapper">
+            <div class="col-md-12">
+              <div class="panel panel-default">
+                <div class="panel-heading" name="memoryUsage-wrapper">
+                  Memory usage
+                  <button onclick="resetChart()" class="btn btn-xs">Clear</button>
+                  <button onclick="stopUpdateDataPoints()" class="btn btn-xs">Stop</button>
+                </div>
+                <div id="chart">
+                  <script>initChart()</script>
                 </div>
               </div>
             </div>
