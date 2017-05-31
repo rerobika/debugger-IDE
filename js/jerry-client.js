@@ -253,6 +253,7 @@ Session.prototype.createNewSession = function(name, data, tab, saved) {
   var doc = new env.Document(data.trim());
   // Create a new javascript mode session from the document.
   var eSession = new env.EditSession(doc, "ace/mode/javascript");
+  // Chart variables
   var breakpointInformationToChart = "";
 
   // Store the edit session.
@@ -1091,7 +1092,7 @@ $(document).ready(function()
     }
 
     var address = $("#host-ip").val() + ":" + $("#host-port").val();
-
+    document.getElementsByClassName('chart-btn')[2].disabled = false;
     logger.info("Connect to: " + address);
     client.debuggerObj = new DebuggerClient(address);
 
@@ -1548,7 +1549,7 @@ function DebuggerClient(address)
       client.socket = null;
       client.debuggerObj = null;
       logger.info("Connection closed.");
-      stopUpdateDataPoints();
+      disableChartButtons();
       // "Reset the editor".
       util.clearElement($("#backtrace-content"));
       session.deleteBreakpointsFromEditor();
@@ -2018,20 +2019,35 @@ function DebuggerClient(address)
       {
         var messagedata = decodeMessage("IIIII", message, 1);
 
-        if(breakpointInformationToChart)
-        {
-          var breakpointLine = breakpointInformationToChart.split(":");
-          addNewDataPoints(messagedata, "line: " + (breakpointLine[1].split(" "))[0]);
-          breakpointInformationToChart = "";
-        }
-        else
+        if (logChartInfo)
         {
           logger.info("Allocated bytes: " + messagedata[0]);
           logger.info("Byte code bytes: " + messagedata[1]);
           logger.info("String bytes: " + messagedata[2]);
           logger.info("Object bytes: " + messagedata[3]);
           logger.info("Property bytes: " + messagedata[4]);
-          startUpdateDataPoints(messagedata);
+          logChartInfo = false;
+          msIsActive = true;
+          document.getElementsByClassName('chart-btn')[0].disabled = true;
+          document.getElementsByClassName('chart-btn')[1].disabled = false;
+          document.getElementsByClassName('chart-btn')[2].disabled = true;
+          document.getElementById('record-btn').style.backgroundColor = "#16e016";
+        }
+        if(breakpointInformationToChart && msIsActive)
+        {
+          var breakpointLineToChart = "line: " + breakpointInformationToChart.split(":")[1].split(" ")[0];
+          if (!checkTime.includes(breakpointLineToChart))
+           {
+             addNewDataPoints(messagedata, breakpointLineToChart);
+           }
+           else
+           {
+             addNewDataPoints(messagedata, new Date().toISOString().slice(14, 21));
+             var loop = setInterval(function(){}, 600);
+             sleep(500);
+             client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+           }
+           breakpointInformationToChart = "";
         }
         return;
       }
@@ -2599,6 +2615,7 @@ function debuggerCommand(event)
       break;
     case "ms":
     case "memstats":
+      logChartInfo = true;
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
       break;
     case "c":

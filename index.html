@@ -101,6 +101,9 @@
         <li>
           <div class="navbar-button settings-toggle" id="settings-button"><i class="fa fa-cog"></i> Settings</div>
         </li>
+        <li>
+          <div class="navbar-button" id="export-button" id="export-btn" onclick="exportMemoryUsageData()">Export</div>
+        </li>
       </ul>
       <!-- /Settings menu -->
     </div>
@@ -408,8 +411,9 @@
               <div class="panel panel-default">
                 <div class="panel-heading" name="memoryUsage-wrapper">
                   Memory usage
-                  <button onclick="resetChart()" class="btn btn-xs">Clear</button>
-                  <button onclick="stopUpdateDataPoints()" class="btn btn-xs">Stop</button>
+                  <button onclick="resetChart()" class="btn btn-xs chart-btn" id="reset-btn" disabled="true">Clear</button>
+                  <button onclick="stopChartWithButton()" class="btn btn-xs chart-btn" disabled="true">Pause</button>
+                  <button onclick="startChartWithButton()" class="btn btn-xs chart-btn" id="record-btn"  disabled="true">Record</button>
                 </div>
                 <div id="chart">
                   <script>initChart()</script>

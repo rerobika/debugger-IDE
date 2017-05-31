@@ -6,6 +6,8 @@ var maxDatapointNumber;
 var minimumXIndex;
 var dataUpdateInterval = 500;
 var scrollable;
+var logChartInfo = false;
+var msIsActive = false;
 
 var checkTime;
 var byte_code_bytes;
@@ -63,11 +65,6 @@ function initChart(redraw = undefined)
 		});
 		document.getElementById("chart").addEventListener("mousewheel", MouseWheelHandler);
 		document.getElementById("chart").addEventListener("DOMMouseScroll", MouseWheelHandler);
-		/*
-		TODO: FIX scroll when mouse of of memoryUsage-wrapper
-		document.getElementById("memoryUsage-wrapper").addEventListener("mouseenter", function() {document.getElementsByTagName('body')[0].style.overflow = "hidden";});
-		document.getElementById("memoryUsage-wrapper").addEventListener("mouseout", function() {document.getElementsByTagName('body')[0].style.overflow = "scroll";});
-		*/
 	}
 	else
 	{
@@ -81,20 +78,8 @@ function updateminimumXIndex()
 	return minimumXIndex;
 }
 
-function addNewDataPoints(data, breakpointInformation = undefined) {
-	if(breakpointInformation === undefined)
-	{
-		checkTime.push(new Date().toISOString().slice(14, 21));
-	}
-	else if(checkTime.indexOf(breakpointInformation) === -1)
-	{
-			checkTime.push(breakpointInformation);
-	}
-	else
-	{
-		return;
-	}
-
+function addNewDataPoints(data, breakpointInformation) {
+	checkTime.push(breakpointInformation);
 	byte_code_bytes.push(data[1]);
 	string_bytes.push(data[2]);
 	property_bytes.push(data[4]);
@@ -119,26 +104,6 @@ function addNewDataPoints(data, breakpointInformation = undefined) {
 		minimumXIndex++;
 		updateScrolledChart();
 	}
-}
-
-function stopUpdateDataPoints()
-{
-	clearInterval(updateDataPoints);
-	scrollable = true;
-}
-
-function startUpdateDataPoints(data)
-{
-	stopUpdateDataPoints();
-	scrollable = false;
-
-	function loopUpdate()
-	{
-		addNewDataPoints(data);
-	}
-
-	updateDataPoints = setInterval(loopUpdate, dataUpdateInterval);
-	scrollable = false;
 }
 
 function MouseWheelHandler(e)
@@ -186,6 +151,10 @@ function resetChart()
 		delete property_bytes;
 		delete object_bytes;
 		delete allocated_bytes;
+
+		document.getElementsByClassName('chart-btn')[0].disabled = true;
+		document.getElementsByClassName('chart-btn')[1].disabled = true;
+		document.getElementById('record-btn').style.removeProperty('background-color');
 		initChart();
 }
 
@@ -200,4 +169,56 @@ function initVariables()
 	property_bytes = ['property_bytes',];
 	object_bytes = ['object_bytes',];
 	allocated_bytes = ['allocated_bytes',];
+}
+
+function disableChartButtons()
+{
+	var list = document.getElementsByClassName('chart-btn');
+	for (var i = 0; i < list.length; i++) {
+		list[i].disabled = true;
+	}
+	document.getElementById('record-btn').style.removeProperty('background-color');
+}
+
+function startChartWithButton()
+{
+	logChartInfo = true;
+	client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
+}
+
+function stopChartWithButton()
+{
+	msIsActive = false;
+	document.getElementsByClassName('chart-btn')[0].disabled = false;
+	document.getElementsByClassName('chart-btn')[1].disabled = true;
+	document.getElementsByClassName('chart-btn')[2].disabled = false;
+	document.getElementById('record-btn').style.backgroundColor = "#e22b1b";
+}
+
+function exportMemoryUsageData()
+{
+	if(checkTime.length == 1)
+	{
+		alert("There is nothing to be exported");
+		return;
+	}
+	var data = [checkTime, byte_code_bytes, string_bytes, property_bytes, object_bytes, allocated_bytes]
+	data[0][0] = "Checked at:"
+	var csv = '';
+    data.forEach(function(row) {
+            csv += row.join(',');
+            csv += "\n";
+    });
+
+    var hiddenElement = document.createElement('a');
+    hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+    hiddenElement.target = '_blank';
+    hiddenElement.download = 'memoryUsage.csv';
+    hiddenElement.click();
+}
+
+function sleep(delay)
+{
+    var start = new Date().getTime();
+    while (new Date().getTime() < start + delay);
 }
