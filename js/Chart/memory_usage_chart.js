@@ -8,6 +8,7 @@ var dataUpdateInterval = 500;
 var scrollable;
 var logChartInfo = false;
 var msIsActive = false;
+var activeChart = false;
 
 var checkTime;
 var byte_code_bytes;
@@ -44,7 +45,8 @@ function initChart(redraw = undefined)
 						allocated_bytes: 'area-spline'
 				},
 	      order: null,
-				groups: [['byte_code_bytes', 'string_bytes', 'property_bytes', 'object_bytes', 'allocated_bytes']]
+				groups: [['byte_code_bytes', 'string_bytes', 'property_bytes', 'object_bytes', 'allocated_bytes']],
+				onclick: function (d, element) { markSelectedLine(d); }
 
 			},
 			axis:{
@@ -155,6 +157,7 @@ function resetChart()
 		document.getElementsByClassName('chart-btn')[0].disabled = true;
 		document.getElementsByClassName('chart-btn')[1].disabled = true;
 		document.getElementById('record-btn').style.removeProperty('background-color');
+		session.unhighlightBreakpointLine();
 		initChart();
 }
 
@@ -173,6 +176,8 @@ function initVariables()
 
 function disableChartButtons()
 {
+	msIsActive = false;
+	activeChart = false;
 	var list = document.getElementsByClassName('chart-btn');
 	for (var i = 0; i < list.length; i++) {
 		list[i].disabled = true;
@@ -183,12 +188,13 @@ function disableChartButtons()
 function startChartWithButton()
 {
 	logChartInfo = true;
+	activeChart = true;
 	client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
 }
 
 function stopChartWithButton()
 {
-	msIsActive = false;
+	activeChart = false;
 	document.getElementsByClassName('chart-btn')[0].disabled = false;
 	document.getElementsByClassName('chart-btn')[1].disabled = true;
 	document.getElementsByClassName('chart-btn')[2].disabled = false;
@@ -217,8 +223,15 @@ function exportMemoryUsageData()
     hiddenElement.click();
 }
 
-function sleep(delay)
-{
-    var start = new Date().getTime();
-    while (new Date().getTime() < start + delay);
+function markSelectedLine(d) {
+	var lineNumber;
+	if (checkTime[d.x + minimumXIndex].startsWith("line"))
+	{
+		lineNumber = checkTime[d.x + minimumXIndex].split("line: ")[1];
+	}
+	else
+	{
+		lineNumber = checkTime[d.x + minimumXIndex].split("#")[1].split(":")[0];
+	}
+	session.highlightBreakPointLine(lineNumber);
 }

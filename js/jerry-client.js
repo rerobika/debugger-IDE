@@ -72,7 +72,14 @@ var keybindings = {
   emacs : "ace/keyboard/emacs",
   custom : null, // Create own bindings here.
 };
-
+/**
+* Keycodes
+*/
+const keys =
+{
+  upArrow : 38,
+  downArrow : 40
+};
 /**
 * Basic utilities.
 */
@@ -172,6 +179,11 @@ function Session(editor) {
   this.nextID = 0;
   this.activeID = 0;
   this.data = [];
+  //Command line variables
+  this.usedCommandList = ["commands: "];
+  this.usedCommandCounter = -1;
+  // Chart variables
+  this.breakpointInformationToChart = null;
 
   this.breakpointIDs = [];
   this.lastBreakpoint = null;
@@ -179,6 +191,8 @@ function Session(editor) {
   this.marker = {
     executed : null,
     lastMarked : null,
+    breakpointLine : null,
+    lastMarkedBreakpointLine : null,
   };
 
   this.isWelcomeTabActive = true;
@@ -253,8 +267,6 @@ Session.prototype.createNewSession = function(name, data, tab, saved) {
   var doc = new env.Document(data.trim());
   // Create a new javascript mode session from the document.
   var eSession = new env.EditSession(doc, "ace/mode/javascript");
-  // Chart variables
-  var breakpointInformationToChart = "";
 
   // Store the edit session.
   this.data.push({
@@ -514,6 +526,30 @@ Session.prototype.highlightCurrentLine = function(lineNumber) {
 Session.prototype.unhighlightLine = function() {
   this.editor.getSession().removeMarker(this.marker.executed);
   this.editor.session.removeGutterDecoration(this.marker.lastMarked, "execute-gutter-cell-marker");
+}
+
+/**
+* Highlights the current breakpoint line in the editor session with a border.
+*
+* @param {integer} lineNumber The selected line.
+*/
+Session.prototype.highlightBreakPointLine = function(lineNumber) {
+  lineNumber--;
+  this.unhighlightBreakpointLine();
+  var Range = ace.require("ace/range").Range;
+  this.marker.breakpointLine = this.editor.session.addMarker(new Range(lineNumber, 0, lineNumber, 1), "breakpoint-marker", "fullLine");
+
+  this.editor.session.addGutterDecoration(lineNumber, "breakpoint-gutter-cell-marker");
+  this.editor.scrollToLine(lineNumber, true, true, function () {});
+  this.marker.lastMarkedBreakpointLine = lineNumber;
+}
+
+/**
+* Removes the highlight (border) from the last highlighted breakpoint line.
+*/
+Session.prototype.unhighlightBreakpointLine = function() {
+  this.editor.getSession().removeMarker(this.marker.breakpointLine);
+  this.editor.session.removeGutterDecoration(this.marker.lastMarkedBreakpointLine, "breakpoint-gutter-cell-marker");
 }
 
 /**
@@ -1228,6 +1264,31 @@ $(document).ready(function()
   });
 });
 
+/*
+* Command line log
+*/
+$('#command-line-input').keydown(function(e) {
+    if (e.keyCode == keys.upArrow)
+    {
+      if(session.usedCommandCounter == -1)
+      {
+        session.usedCommandCounter= session.usedCommandList.length;
+      }
+      if(session.usedCommandCounter > 1)
+      {
+        session.usedCommandCounter--;
+        document.getElementById('command-line-input').value = session.usedCommandList[session.usedCommandCounter];
+      }
+    }
+    else if(e.keyCode == keys.downArrow){
+       if (session.usedCommandList.length != 1 && session.usedCommandCounter != session.usedCommandList.length-1)
+       {
+         session.usedCommandCounter++;
+         document.getElementById('command-line-input').value = session.usedCommandList[session.usedCommandCounter];
+       }
+    }
+});
+
 /**
 * Bootstrap column resizer.
 */
@@ -1554,6 +1615,7 @@ function DebuggerClient(address)
       util.clearElement($("#backtrace-content"));
       session.deleteBreakpointsFromEditor();
       session.unhighlightLine();
+      session.unhighlightBreakpointLine();
       surface.disableActionButtons(true);
     }
   }
@@ -2033,21 +2095,21 @@ function DebuggerClient(address)
           document.getElementsByClassName('chart-btn')[2].disabled = true;
           document.getElementById('record-btn').style.backgroundColor = "#16e016";
         }
-        if(breakpointInformationToChart && msIsActive)
+        if(session.breakpointInformationToChart && activeChart)
         {
-          var breakpointLineToChart = "line: " + breakpointInformationToChart.split(":")[1].split(" ")[0];
+          var breakpointLineToChart = "line: " + session.breakpointInformationToChart.split(":")[1].split(" ")[0];
           if (!checkTime.includes(breakpointLineToChart))
            {
              addNewDataPoints(messagedata, breakpointLineToChart);
            }
-           else
+           else if (msIsActive)
            {
-             addNewDataPoints(messagedata, new Date().toISOString().slice(14, 21));
-             var loop = setInterval(function(){}, 600);
-             sleep(500);
-             client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+             addNewDataPoints(messagedata, "#" + session.breakpointInformationToChart.split(":")[1].split(" ")[0] + ": " + new Date().toISOString().slice(14, 21));
+             var loop = function(){
+               client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+             }
+             setTimeout(loop, 500);
            }
-           breakpointInformationToChart = "";
         }
         return;
       }
@@ -2102,6 +2164,7 @@ function DebuggerClient(address)
             $(".load-from-jerry").on("click", function(e)
             {
               session.unhighlightLine();
+              session.unhighlightBreakpointLine();
               var code = breakpoint.func.source;
               session.createNewSession(name, code, session.tabType.work, true);
               $("." + groupID).addClass("disabled");
@@ -2117,6 +2180,7 @@ function DebuggerClient(address)
         {
           // Remove the highlite from the current session.
           session.unhighlightLine();
+          session.unhighlightBreakpointLine();
 
           // Change the session.
           session.switchSession(sID);
@@ -2137,7 +2201,7 @@ function DebuggerClient(address)
 
         /*Add breakpoint information to chart*/
         client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
-        breakpointInformationToChart = breakpointToString(breakpoint);
+        session.breakpointInformationToChart = breakpointToString(breakpoint);
         /* EXTENDED CODE */
         return;
       }
@@ -2533,6 +2597,8 @@ function debuggerCommand(event)
     return true;
   }
   var command = env.commandInput.val().trim();
+  session.usedCommandList.push(command);
+  session.usedCommandCounter = -1;
   args = /^([a-zA-Z]+)(?:\s+([^\s].*)|)$/.exec(command);
   if (!args)
   {
@@ -2616,6 +2682,7 @@ function debuggerCommand(event)
     case "ms":
     case "memstats":
       logChartInfo = true;
+      activeChart = true;
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
       break;
     case "c":
