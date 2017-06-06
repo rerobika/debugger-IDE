@@ -101,7 +101,9 @@
 
 /*-- Tooltip --*/
 .c3-tooltip-container {
-  z-index: 10; }
+  z-index: 10;
+  width: 200px !important;
+ }
 
 .c3-tooltip {
   border-collapse: collapse;

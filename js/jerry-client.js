@@ -654,7 +654,7 @@ function Surface() {
     continue : 1
   };
 
-  this.continueActive = true;
+  this.continueActive = false;
 
   this.numberOfHiddenPanel = 0;
   this.lastKnownTargetCol = 6;
@@ -664,6 +664,37 @@ function Surface() {
 
   this.util = new Util();
 }
+/**
+* Continue execution dependency
+*/
+Surface.prototype.continueCommand = function () {
+  this.continueStopButtonState(surface.CSState.stop);
+  $("#step-button").addClass("disabled");
+  $("#next-button").addClass("disabled");
+  if (activeChart && !this.continueActive)
+  {
+    this.continueActive = true;
+    client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_NEXT);
+  }
+  else
+  {
+    client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_CONTINUE);
+  }
+};
+
+/**
+* Stop execution
+*/
+Surface.prototype.stopCommand = function () {
+  this.continueStopButtonState(surface.CSState.continue);
+  $("#step-button").removeClass("disabled");
+  $("#next-button").removeClass("disabled");
+  this.continueActive = false;
+  if (timeoutLoop !== undefined)
+  {
+    clearTimeout(timeoutLoop);
+  }
+};
 
 /**
 * Returns the continueActive state.
@@ -709,7 +740,7 @@ Surface.prototype.continueStopButtonState = function(state) {
   {
     case this.CSState.stop:
     {
-      this.continueActive = false;
+      //this.continueActive = true;
       $("#continue-stop-button i").removeClass("fa-play");
       $("#continue-stop-button i").addClass("fa-stop");
     } break;
@@ -717,7 +748,7 @@ Surface.prototype.continueStopButtonState = function(state) {
     {
       $("#continue-stop-button i").removeClass("fa-stop");
       $("#continue-stop-button i").addClass("fa-play");
-      this.continueActive = true;
+      //this.continueActive = false;
     } break;
   }
 };
@@ -1184,14 +1215,13 @@ $(document).ready(function()
       return true;
     }
 
-    if (surface.isContinueActive())
+    if (!surface.isContinueActive())
     {
-      surface.continueStopButtonState(surface.CSState.stop);
-      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_CONTINUE ]);
+      surface.continueCommand();
     }
     else
     {
-      surface.continueStopButtonState(surface.CSState.continue);
+      surface.stopCommand();
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
     }
   });
@@ -1202,8 +1232,10 @@ $(document).ready(function()
     {
       return true;
     }
-
-    client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STEP ]);
+    if(!surface.isContinueActive())
+    {
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STEP ]);
+    }
   });
 
   $("#next-button").on("click", function()
@@ -1212,8 +1244,10 @@ $(document).ready(function()
     {
       return true;
     }
-
-    client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+    if(!surface.isContinueActive())
+    {
+      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+    }
   });
 
   /*
@@ -1340,11 +1374,9 @@ $(function() {
       // Refresh the columns.
       updateClass(target, targetSet);
       updateClass(next, nextSet);
-      if(scrollable === true)
-      {
-        initChart("redraw");
-      }
-      maxDatapointNumber = Math.floor(document.getElementById("chart").clientWidth / 65);
+      //Resize chart
+      initChart("redraw");
+      maxDatapointNumber = Math.floor(document.getElementById("chart").clientWidth / 30);
     },
   });
 });
@@ -2081,15 +2113,10 @@ function DebuggerClient(address)
       {
         var messagedata = decodeMessage("IIIII", message, 1);
 
-        if (logChartInfo)
+        if (startRecord)
         {
-          logger.info("Allocated bytes: " + messagedata[0]);
-          logger.info("Byte code bytes: " + messagedata[1]);
-          logger.info("String bytes: " + messagedata[2]);
-          logger.info("Object bytes: " + messagedata[3]);
-          logger.info("Property bytes: " + messagedata[4]);
-          logChartInfo = false;
-          msIsActive = true;
+          startRecord = false;
+          activeChart = true;
           document.getElementsByClassName('chart-btn')[0].disabled = true;
           document.getElementsByClassName('chart-btn')[1].disabled = false;
           document.getElementsByClassName('chart-btn')[2].disabled = true;
@@ -2097,18 +2124,18 @@ function DebuggerClient(address)
         }
         if(session.breakpointInformationToChart && activeChart)
         {
-          var breakpointLineToChart = "line: " + session.breakpointInformationToChart.split(":")[1].split(" ")[0];
-          if (!checkTime.includes(breakpointLineToChart))
+          var breakpointLineToChart = "ln: " + session.breakpointInformationToChart.split(":")[1].split(" ")[0];
+          if (surface.isContinueActive())
+          {
+            addNewDataPoints(messagedata, "#" + session.breakpointInformationToChart.split(":")[1].split(" ")[0] + ": " + new Date().toISOString().slice(14, 21));
+            var loop = function(){
+              client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_NEXT);
+            }
+            timeoutLoop = setTimeout(loop, dataUpdateInterval);
+          }
+          else
            {
              addNewDataPoints(messagedata, breakpointLineToChart);
-           }
-           else if (msIsActive)
-           {
-             addNewDataPoints(messagedata, "#" + session.breakpointInformationToChart.split(":")[1].split(" ")[0] + ": " + new Date().toISOString().slice(14, 21));
-             var loop = function(){
-               client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
-             }
-             setTimeout(loop, 500);
            }
         }
         return;
@@ -2146,8 +2173,10 @@ function DebuggerClient(address)
 
         /* EXTENDED CODE */
         session.setLastBreakpoint(breakpoint);
-
-        surface.continueStopButtonState(surface.CSState.continue);
+        if(!surface.isContinueActive())
+        {
+          surface.continueStopButtonState(surface.CSState.continue);
+        }
 
         if (breakpoint.func.sourceName != '')
         {
@@ -2200,6 +2229,14 @@ function DebuggerClient(address)
         }
 
         /*Add breakpoint information to chart*/
+        for (var i in activeBreakpoints) {
+          if(activeBreakpoints[i].line == breakpointToString(breakpoint).split(":")[1].split(" ")[0] && surface.isContinueActive())
+          {
+            surface.stopCommand();
+            return;
+          }
+        }
+
         client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
         session.breakpointInformationToChart = breakpointToString(breakpoint);
         /* EXTENDED CODE */
@@ -2677,25 +2714,26 @@ function debuggerCommand(event)
       client.debuggerObj.deletePendingBreakpoint(args[2]);
     case "st":
     case "stop":
+      surface.stopCommand();
       client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STOP ]);
-      break;
-    case "ms":
-    case "memstats":
-      logChartInfo = true;
-      activeChart = true;
-      client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_MEMSTATS ]);
       break;
     case "c":
     case "continue":
-      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_CONTINUE);
+      surface.continueCommand();
       break;
     case "s":
     case "step":
-      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_STEP);
+      if(!surface.isContinueActive())
+      {
+        client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_STEP ]);
+      }
       break;
     case "n":
     case "next":
-      client.debuggerObj.sendResumeExec(ClientPackageType.JERRY_DEBUGGER_NEXT);
+      if(!surface.isContinueActive())
+      {
+        client.debuggerObj.encodeMessage("B", [ ClientPackageType.JERRY_DEBUGGER_NEXT ]);
+      }
       break;
     case "e":
     case "eval":

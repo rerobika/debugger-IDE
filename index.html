@@ -101,9 +101,26 @@
         <li>
           <div class="navbar-button settings-toggle" id="settings-button"><i class="fa fa-cog"></i> Settings</div>
         </li>
-        <li>
-          <div class="navbar-button" id="export-button" id="export-btn" onclick="exportMemoryUsageData()">Export</div>
-        </li>
+        <!-- Export dropdown menu -->
+        <ul class="nav navbar-nav navbar-top-links">
+          <li class="dropdown">
+            <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+              <i class="fa fa-download fa-fw"></i> Download</i>
+            </a>
+            <ul class="dropdown-menu dropdown-messages">
+              <li>
+                <div class="dropdown-button" id="export-btn" onclick="exportMemoryUsageData()">
+                  <div>
+                    <strong><i class="fa fa-file-text-o"></i> Memory usage</strong>
+                  </div>
+                  <div>Export measured memory usage data to a .csv file.</div>
+                </div>
+              </li>
+              <li class="divider"></li>
+            </ul>
+          </li>
+        </ul>
+        <!-- /Export dropdown menu -->
       </ul>
       <!-- /Settings menu -->
     </div>
